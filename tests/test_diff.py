@@ -159,13 +159,23 @@ def test_gap_classification_extraction() -> None:
 
 
 def test_gap_classification_rendering() -> None:
-    """Both scores low → content not in raw bytes AND not extracted
-    → GapKind.RENDERING (true CSR)."""
+    """Both scores low and roughly equal → content not in raw bytes
+    AND not extracted → GapKind.RENDERING (true CSR)."""
     assert _classify_gap(0.10, 0.10, 200, 200) == GapKind.RENDERING
 
 
-def test_gap_classification_mixed() -> None:
-    """Raw bytes low but visibility OK → GapKind.MIXED (rare edge case)."""
+def test_gap_classification_mixed_both_low_but_raw_higher() -> None:
+    """Both scores below threshold but raw_presence notably higher than
+    visibility → GapKind.MIXED (some content in bytes, some only post-JS).
+    This is the Anthropic Economic Index real-world pattern: raw 40%,
+    visibility 5% — data tables in RSC flight data, explanatory text
+    genuinely client-rendered."""
+    assert _classify_gap(0.40, 0.05, 200, 200) == GapKind.MIXED
+
+
+def test_gap_classification_mixed_raw_low_vis_ok() -> None:
+    """Raw bytes low but visibility OK → GapKind.MIXED (rare edge case
+    where extractor sees more than raw bytes search)."""
     assert _classify_gap(0.50, 0.95, 200, 200) == GapKind.MIXED
 
 

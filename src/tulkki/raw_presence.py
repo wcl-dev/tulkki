@@ -22,7 +22,7 @@ from .types import ExtractedDoc, Heading, RawPresenceReport
 
 MIN_SENTENCE_CHARS = 45  # shorter fragments ("OK.", "Learn more") cause false positives
 MAX_SENTENCES = 400  # cap work on very large pages
-PROBE_CHARS = 80  # first N chars of a sentence are enough to be unique
+PROBE_CHARS = 60  # first N chars of a sentence are enough to be unique
 
 # Sentence boundary: period/exclamation/question followed by whitespace then
 # an uppercase letter, digit, or opening quote. Not perfect, but good enough
@@ -59,6 +59,12 @@ def _normalize_haystack(raw_html: str) -> str:
     # Common HTML entities that appear in free text
     s = s.replace("&amp;", "&").replace("&quot;", '"')
     s = s.replace("&#39;", "'").replace("&apos;", "'")
+    # Normalize Unicode punctuation to ASCII equivalents so that
+    # trafilatura's output (which may use curly quotes) matches the
+    # raw HTML (which typically uses straight quotes or escapes).
+    s = s.replace("\u2018", "'").replace("\u2019", "'")  # ' '
+    s = s.replace("\u201c", '"').replace("\u201d", '"')  # " "
+    s = s.replace("\u2013", "-").replace("\u2014", "-")  # – —
     # Collapse whitespace
     s = re.sub(r"\s+", " ", s)
     return s
@@ -66,7 +72,11 @@ def _normalize_haystack(raw_html: str) -> str:
 
 def _normalize_needle(sentence: str) -> str:
     """Normalize a rendered sentence for matching against the haystack."""
-    return re.sub(r"\s+", " ", sentence.lower()).strip()
+    s = sentence.lower()
+    s = s.replace("\u2018", "'").replace("\u2019", "'")
+    s = s.replace("\u201c", '"').replace("\u201d", '"')
+    s = s.replace("\u2013", "-").replace("\u2014", "-")
+    return re.sub(r"\s+", " ", s).strip()
 
 
 # --- Sentence extraction -----------------------------------------------------

@@ -151,7 +151,7 @@ def check(
     elif quiet:
         typer.echo(f"{report.visibility_score * 100:.1f}")
     else:
-        render_terminal(report, console=out_console)
+        render_terminal(report, console=out_console, no_render=no_render)
         if ai_path is not None and human_path is not None:
             out_console.print(
                 f"[dim]Outputs saved:[/dim]\n"

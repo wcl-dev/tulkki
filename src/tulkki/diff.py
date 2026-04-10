@@ -104,6 +104,12 @@ def _classify_gap(
         return GapKind.EXTRACTION
     if not raw_ok and ext_ok:
         return GapKind.MIXED
+    # Both scores below threshold. Distinguish: if raw bytes contain
+    # notably more than what the extractor sees, it's a mix of both
+    # extraction failure and rendering failure. If they're roughly
+    # equal (both very low), it's pure rendering failure.
+    if raw_presence_score > visibility_score + 0.20:
+        return GapKind.MIXED
     return GapKind.RENDERING
 
 
