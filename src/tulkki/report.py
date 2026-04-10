@@ -1,13 +1,14 @@
-"""Report rendering — terminal (rich), JSON, and unified diff.
+"""Report rendering — terminal (rich), JSON, unified diff, and HTML.
 
 Pure presentation layer. Takes a VisibilityReport and produces either
-human-readable terminal output, a machine-readable JSON dict, or a
-coloured unified diff of the AI view vs the human view.
+human-readable terminal output, a machine-readable JSON dict, a
+coloured unified diff, or a self-contained HTML report.
 """
 
 from __future__ import annotations
 
 import difflib
+import html as html_mod
 import json
 from dataclasses import asdict
 from datetime import datetime
@@ -69,6 +70,14 @@ def _score_color(score: float) -> str:
     if score >= 0.5:
         return "yellow"
     return "red"
+
+
+def _score_color_hex(score: float) -> str:
+    if score >= 0.85:
+        return "#22c55e"
+    if score >= 0.5:
+        return "#eab308"
+    return "#ef4444"
 
 
 def _interpretation(report: VisibilityReport) -> str:
@@ -275,6 +284,10 @@ def render_terminal(
         for h in report.raw_presence.missing_headings:
             console.print(f"  [red]x[/red] {h.text}  [dim](h{h.level})[/dim]")
 
+    # --- Condensed diff (always shown when there IS a diff) ------------------
+    if report.visibility_score < 0.99:
+        _render_condensed_diff(report, console)
+
     console.print()
 
 
@@ -334,31 +347,75 @@ def render_json(report: VisibilityReport) -> str:
     return json.dumps(to_dict(report), indent=2, ensure_ascii=False)
 
 
-def render_diff(report: VisibilityReport, console: Console | None = None) -> None:
-    """Print a coloured unified diff of the AI view vs the human view.
-
-    Green lines are present in the human view but not in the AI view
-    (= what AI crawlers miss). Red lines are present in the AI view but
-    not in the human view (usually trafilatura extraction noise, rare).
-    This gives users a direct answer to "what exactly is the AI missing?"
-    without forcing them to open both markdown files in an external diff
-    viewer.
-    """
-    console = console or Console()
-
-    ai_lines = report.ai_doc.markdown.splitlines()
-    human_lines = report.human_doc.markdown.splitlines()
-
-    diff_lines = list(
+def _get_diff_lines(report: VisibilityReport) -> list[str]:
+    """Compute the unified diff lines between AI and human views."""
+    return list(
         difflib.unified_diff(
-            ai_lines,
-            human_lines,
+            report.ai_doc.markdown.splitlines(),
+            report.human_doc.markdown.splitlines(),
             fromfile="ai_view.md",
             tofile="human_view.md",
             lineterm="",
             n=2,
         )
     )
+
+
+def _print_diff_line(line: str, console: Console) -> None:
+    """Print a single diff line with appropriate coloring."""
+    if line.startswith("+++") or line.startswith("---"):
+        console.print(f"[bold]{line}[/bold]", highlight=False)
+    elif line.startswith("@@"):
+        console.print(f"[cyan]{line}[/cyan]", highlight=False)
+    elif line.startswith("+"):
+        console.print(f"[green]{line}[/green]", highlight=False)
+    elif line.startswith("-"):
+        console.print(f"[red]{line}[/red]", highlight=False)
+    else:
+        console.print(f"[dim]{line}[/dim]", highlight=False)
+
+
+def _render_condensed_diff(
+    report: VisibilityReport, console: Console, max_lines: int = 15
+) -> None:
+    """Print a short preview of the content diff inside the main report."""
+    diff_lines = _get_diff_lines(report)
+    if not diff_lines:
+        return
+
+    console.print()
+    console.print(
+        "[bold]Content diff preview[/bold]  "
+        "[dim](AI view vs Human view):[/dim]"
+    )
+
+    shown = 0
+    for line in diff_lines:
+        if shown >= max_lines:
+            break
+        # Skip the --- / +++ header in condensed mode
+        if line.startswith("---") or line.startswith("+++"):
+            continue
+        _print_diff_line(line, console)
+        shown += 1
+
+    remaining = len(diff_lines) - max_lines
+    if remaining > 0:
+        console.print(
+            f"  [dim]... {remaining} more lines. "
+            f"Run with --show-diff to see the full diff.[/dim]"
+        )
+
+
+def render_diff(report: VisibilityReport, console: Console | None = None) -> None:
+    """Print the full coloured unified diff of the AI view vs the human view.
+
+    Green lines are present in the human view but not in the AI view
+    (= what AI crawlers miss). Red lines are present in the AI view but
+    not in the human view (usually trafilatura extraction noise, rare).
+    """
+    console = console or Console()
+    diff_lines = _get_diff_lines(report)
 
     console.print()
     console.rule("[bold]Content diff[/bold]  [dim](AI view → Human view)[/dim]")
@@ -372,16 +429,7 @@ def render_diff(report: VisibilityReport, console: Console | None = None) -> Non
         return
 
     for line in diff_lines:
-        if line.startswith("+++") or line.startswith("---"):
-            console.print(f"[bold]{line}[/bold]", highlight=False)
-        elif line.startswith("@@"):
-            console.print(f"[cyan]{line}[/cyan]", highlight=False)
-        elif line.startswith("+"):
-            console.print(f"[green]{line}[/green]", highlight=False)
-        elif line.startswith("-"):
-            console.print(f"[red]{line}[/red]", highlight=False)
-        else:
-            console.print(f"[dim]{line}[/dim]", highlight=False)
+        _print_diff_line(line, console)
 
     console.print()
     console.print(
@@ -430,3 +478,239 @@ def render_raw_hits(
         )
 
     console.print()
+
+
+# --- HTML report -------------------------------------------------------------
+
+_METRIC_HELP = {
+    "raw_html_coverage": (
+        "Raw HTML coverage measures what fraction of the human-visible "
+        "content can be found as literal text inside the raw HTML bytes "
+        "(before any JavaScript runs). This represents the upper bound of "
+        "what any AI crawler could possibly see — including training "
+        "pipelines that tokenize raw HTML directly."
+    ),
+    "extractor_visibility": (
+        "Extractor visibility measures what fraction of the human-visible "
+        "content is recovered by a standard boilerplate-stripping extractor "
+        "(trafilatura). This represents what tools like Common Crawl's WET "
+        "files, readability.js, and most content-extraction pipelines would "
+        "actually see."
+    ),
+    "gap_kind": (
+        "Gap kind classifies why content is missing. "
+        "'NONE' = AI sees everything. "
+        "'EXTRACTION' = content is in the HTML bytes but extractors can't "
+        "unpack it (e.g. locked inside framework data structures). "
+        "'RENDERING' = content only exists after JavaScript execution. "
+        "'MIXED' = both problems are present. "
+        "'BLOCKED' = HTTP error, scores are meaningless."
+    ),
+}
+
+
+def render_html(report: VisibilityReport) -> str:
+    """Produce a self-contained HTML report with inline CSS.
+
+    The output is a single HTML file that can be opened in any browser,
+    shared via email, attached to a GitHub issue, or embedded in a blog
+    post. No external dependencies — all styles are inline.
+    """
+    e = html_mod.escape
+    rp = report.raw_presence
+    vis_pct = report.visibility_score * 100
+    rp_pct = report.raw_presence_score * 100
+    interp = _interpretation(report)
+    warning = _status_warning(report.raw_status, report.render_status)
+
+    # Build diff HTML
+    diff_lines = _get_diff_lines(report)
+    diff_html_lines: list[str] = []
+    for line in diff_lines:
+        escaped = e(line)
+        if line.startswith("+++") or line.startswith("---"):
+            diff_html_lines.append(f'<div class="diff-meta">{escaped}</div>')
+        elif line.startswith("@@"):
+            diff_html_lines.append(f'<div class="diff-hunk">{escaped}</div>')
+        elif line.startswith("+"):
+            diff_html_lines.append(f'<div class="diff-add">{escaped}</div>')
+        elif line.startswith("-"):
+            diff_html_lines.append(f'<div class="diff-del">{escaped}</div>')
+        else:
+            diff_html_lines.append(f'<div class="diff-ctx">{escaped}</div>')
+    diff_block = "\n".join(diff_html_lines) if diff_html_lines else (
+        '<p class="muted">No difference between AI and human views.</p>'
+    )
+
+    # Missing headings
+    missing_h_html = ""
+    if report.missing_headings:
+        items = "".join(
+            f"<li>{e(h.text)} <span class='muted'>(h{h.level})</span></li>"
+            for h in report.missing_headings
+        )
+        missing_h_html = (
+            f'<h3>Sections AI cannot see</h3><ul class="missing">{items}</ul>'
+        )
+
+    # Framework tag
+    fw_html = ""
+    if rp.frameworks_detected:
+        fw_html = f'<div class="tag">Framework: {e(", ".join(rp.frameworks_detected))}</div>'
+
+    # Warning
+    warning_html = ""
+    if warning:
+        warning_html = f'<div class="warning">{e(warning)}</div>'
+
+    gap_color = "#22c55e" if report.gap_kind == GapKind.NONE else "#eab308"
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tulkki report — {e(report.url)}</title>
+<style>
+  :root {{ --bg: #0f172a; --card: #1e293b; --border: #334155;
+           --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e;
+           --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ font-family: system-ui, -apple-system, sans-serif;
+          background: var(--bg); color: var(--text); padding: 2rem;
+          max-width: 960px; margin: 0 auto; line-height: 1.6; }}
+  h1 {{ font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }}
+  h2 {{ font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--cyan); }}
+  h3 {{ font-size: 0.9rem; margin: 1rem 0 0.5rem; }}
+  .url {{ font-size: 0.85rem; color: var(--cyan); word-break: break-all; }}
+  .card {{ background: var(--card); border: 1px solid var(--border);
+           border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }}
+  .scores {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }}
+  .score-box {{ text-align: center; padding: 1rem; border-radius: 6px;
+                background: var(--bg); }}
+  .score-box .number {{ font-size: 2rem; font-weight: 700; }}
+  .score-box .label {{ font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }}
+  .help {{ font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem;
+           border-left: 2px solid var(--border); padding-left: 0.75rem; }}
+  .tag {{ display: inline-block; background: var(--border); color: var(--text);
+          padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
+          margin: 0.5rem 0; }}
+  .gap-kind {{ font-size: 1.1rem; font-weight: 600; }}
+  .interp {{ color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }}
+  .warning {{ background: #451a1a; border: 1px solid var(--red);
+              border-radius: 6px; padding: 0.75rem; margin: 1rem 0;
+              font-size: 0.85rem; color: var(--red); }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; }}
+  th, td {{ padding: 0.5rem 0.75rem; text-align: left;
+            border-bottom: 1px solid var(--border); }}
+  th {{ color: var(--muted); font-weight: 600; }}
+  td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
+  .muted {{ color: var(--muted); }}
+  .missing {{ list-style: none; padding: 0; }}
+  .missing li::before {{ content: "\\2717 "; color: var(--red); }}
+  .missing li {{ margin: 0.25rem 0; font-size: 0.85rem; }}
+  .diff {{ background: var(--bg); border-radius: 6px; padding: 1rem;
+           font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
+           overflow-x: auto; max-height: 600px; overflow-y: auto; }}
+  .diff-add {{ color: var(--green); }}
+  .diff-del {{ color: var(--red); }}
+  .diff-hunk {{ color: var(--cyan); margin-top: 0.5rem; }}
+  .diff-meta {{ color: var(--muted); font-weight: 600; }}
+  .diff-ctx {{ color: var(--muted); }}
+  .meta {{ font-size: 0.8rem; color: var(--muted); }}
+  footer {{ margin-top: 2rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--muted); }}
+</style>
+</head>
+<body>
+
+<h1>tulkki visibility report</h1>
+<div class="url">{e(report.url)}</div>
+
+{warning_html}
+
+<div class="card">
+  <div class="meta">
+    Fetched at {e(report.fetched_at.isoformat(timespec='seconds'))} &middot;
+    Raw {e(_format_bytes(report.raw_bytes))} ({e(report.raw_backend)}, HTTP {report.raw_status}) &middot;
+    Rendered {e(_format_bytes(report.rendered_bytes))} ({e(report.render_backend)}, HTTP {report.render_status})
+  </div>
+  {fw_html}
+</div>
+
+<div class="scores">
+  <div class="score-box card">
+    <div class="number" style="color: {_score_color_hex(report.raw_presence_score)}">{rp_pct:.1f}%</div>
+    <div class="label">Raw HTML coverage</div>
+    <div class="help">{e(_METRIC_HELP['raw_html_coverage'])}</div>
+  </div>
+  <div class="score-box card">
+    <div class="number" style="color: {_score_color_hex(report.visibility_score)}">{vis_pct:.1f}%</div>
+    <div class="label">Extractor visibility</div>
+    <div class="help">{e(_METRIC_HELP['extractor_visibility'])}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="gap-kind" style="color: {gap_color}">{report.gap_kind.value.upper()}</div>
+  <div class="interp">{e(interp)}</div>
+  <div class="help" style="margin-top: 0.75rem">{e(_METRIC_HELP['gap_kind'])}</div>
+</div>
+
+<h2>Views comparison</h2>
+<div class="card">
+  <table>
+    <tr><th>View</th><th>Title</th><th class="num">Words</th><th class="num">Headings</th></tr>
+    <tr>
+      <td>Extracted (AI)</td>
+      <td>{e(report.ai_doc.title or '—')}</td>
+      <td class="num">{report.ai_doc.word_count:,}</td>
+      <td class="num">{len(report.ai_doc.headings)}</td>
+    </tr>
+    <tr>
+      <td>Rendered (Human)</td>
+      <td>{e(report.human_doc.title or '—')}</td>
+      <td class="num">{report.human_doc.word_count:,}</td>
+      <td class="num">{len(report.human_doc.headings)}</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Raw-bytes presence</h2>
+<div class="card">
+  <table>
+    <tr><th></th><th class="num">Found</th><th class="num">Total</th><th class="num">Coverage</th></tr>
+    <tr>
+      <td>Sentences</td>
+      <td class="num">{rp.sentences_found_in_raw}</td>
+      <td class="num">{rp.sentences_checked}</td>
+      <td class="num">{rp.sentence_coverage * 100:.1f}%</td>
+    </tr>
+    <tr>
+      <td>Headings</td>
+      <td class="num">{rp.headings_found_in_raw}</td>
+      <td class="num">{rp.headings_checked}</td>
+      <td class="num">{rp.heading_coverage * 100:.1f}%</td>
+    </tr>
+  </table>
+</div>
+
+{missing_h_html}
+
+<h2>Content diff</h2>
+<div class="card">
+  <div class="diff">{diff_block}</div>
+  <div class="help" style="margin-top: 0.75rem">
+    <span style="color: var(--green)">Green</span> = visible to humans but not AI.
+    <span style="color: var(--red)">Red</span> = visible to AI but not humans.
+  </div>
+</div>
+
+<footer>
+  Generated by <strong>tulkki {e(report.fetched_at.strftime('%Y-%m-%d %H:%M UTC'))}</strong>
+  &middot; <a href="https://github.com/anthropics/tulkki" style="color: var(--cyan)">github.com/anthropics/tulkki</a>
+</footer>
+
+</body>
+</html>"""

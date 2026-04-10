@@ -25,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
 from .backends import get_raw_fetcher, get_rendering_fetcher
 from .diff import compare
 from .extractor import TrafilaturaExtractor
-from .report import render_diff, render_json, render_raw_hits, render_terminal
+from .report import render_diff, render_html, render_json, render_raw_hits, render_terminal
 from .types import VisibilityReport
 
 app = typer.Typer(
@@ -42,6 +42,94 @@ def _root() -> None:
     Compare what AI crawlers see (no JS) vs what humans see (post-JS) for
     any URL, and produce two markdown files plus a visibility score.
     """
+
+
+@app.command()
+def explain() -> None:
+    """Explain what each metric in a tulkki report means."""
+    console = Console()
+    console.print()
+    console.rule("[bold]tulkki metrics explained[/bold]")
+    console.print()
+
+    sections = [
+        (
+            "Extractor visibility  (visibility_score)",
+            "What fraction of the human-visible content a standard extractor "
+            "(trafilatura) can recover from the raw HTML — without running "
+            "JavaScript.\n\n"
+            "This represents what Common Crawl WET files, readability.js, "
+            "and most content-extraction pipelines would actually see. If "
+            "your page scores 100%, tools that strip HTML boilerplate can "
+            "already read everything. If it scores 5%, they see almost "
+            "nothing.\n\n"
+            "[bold]This is the number that --fail-below checks.[/bold]",
+        ),
+        (
+            "Raw HTML coverage  (raw_presence_score)",
+            "What fraction of the human-visible content can be found as "
+            "literal text inside the raw HTML bytes — before any extraction "
+            "or JavaScript.\n\n"
+            "This is the upper bound of what any AI crawler could possibly "
+            "see, including training pipelines that tokenize raw HTML "
+            "directly (script tags included). A high number means the "
+            "content IS in the bytes; a low number means it genuinely "
+            "requires JavaScript to appear.\n\n"
+            "[bold]This is the number that --fail-below-raw checks.[/bold]",
+        ),
+        (
+            "Gap kind",
+            "[green]NONE[/green] — Both scores are high. AI crawlers see "
+            "the same content as human users. No action needed.\n\n"
+            "[yellow]EXTRACTION[/yellow] — Content is physically present in "
+            "the raw HTML bytes (high raw coverage) but standard extractors "
+            "cannot unpack it (low extractor visibility). Typical cause: "
+            "content locked inside framework data structures like Next.js "
+            "RSC flight data. LLMs trained on raw HTML may see it; LLMs "
+            "trained on Common Crawl WET will not.\n\n"
+            "[yellow]RENDERING[/yellow] — Content is genuinely absent from "
+            "the raw HTML (low raw coverage) and only appears after "
+            "JavaScript execution. This is classic client-side rendering. "
+            "No AI crawler that skips JS will see it.\n\n"
+            "[yellow]MIXED[/yellow] — Both extraction and rendering gaps "
+            "are present. Some content is locked in framework data "
+            "structures, and some is truly client-rendered.\n\n"
+            "[red]BLOCKED[/red] — One or both HTTP fetches returned an "
+            "error (403, 401, 5xx, timeout). Scores are meaningless.",
+        ),
+        (
+            "Content diff  (--show-diff)",
+            "A line-by-line comparison of the AI-extracted markdown versus "
+            "the human-extracted markdown.\n\n"
+            "[green]Green lines[/green] = content visible to humans but "
+            "not to AI (the visibility gap).\n"
+            "[red]Red lines[/red] = content visible to AI but not humans "
+            "(usually extraction noise — rare).\n\n"
+            "The main report shows a condensed preview (first 15 lines). "
+            "Use --show-diff to see the full diff.",
+        ),
+        (
+            "Framework detection",
+            "tulkki scans the raw HTML for signatures of common JavaScript "
+            "frameworks (Next.js RSC, Next.js Pages, Nuxt, SvelteKit, "
+            "Gatsby, Remix). When detected, the interpretation paragraph "
+            "names the specific framework so you know exactly what kind of "
+            "packaging is hiding the content.",
+        ),
+    ]
+
+    for title, body in sections:
+        console.print(f"[bold cyan]{title}[/bold cyan]")
+        console.print()
+        console.print(body)
+        console.print()
+
+    console.print(
+        "[dim]Run [bold]tulkki check URL[/bold] to diagnose a page, "
+        "or [bold]tulkki check URL --html[/bold] to generate a shareable "
+        "HTML report with these explanations built in.[/dim]"
+    )
+    console.print()
 
 
 def _slug(url: str) -> str:
@@ -76,6 +164,12 @@ def check(
     ),
     json_output: bool = typer.Option(
         False, "--json", help="Print machine-readable JSON instead of a report."
+    ),
+    html_output: bool = typer.Option(
+        False,
+        "--html",
+        help="Save a self-contained HTML report alongside the markdown files. "
+        "Opens in any browser — no server needed.",
     ),
     no_render: bool = typer.Option(
         False,
@@ -159,6 +253,11 @@ def check(
     else:
         ai_path = human_path = None
 
+    if html_output:
+        out.mkdir(parents=True, exist_ok=True)
+        html_path = out / f"{_slug(url)}_report.html"
+        html_path.write_text(render_html(report), encoding="utf-8")
+
     if json_output:
         typer.echo(render_json(report))
     elif quiet:
@@ -169,8 +268,14 @@ def check(
             out_console.print(
                 f"[dim]Outputs saved:[/dim]\n"
                 f"  {ai_path}    [dim]({report.ai_doc.word_count:,} words)[/dim]\n"
-                f"  {human_path}  [dim]({report.human_doc.word_count:,} words)[/dim]\n"
+                f"  {human_path}  [dim]({report.human_doc.word_count:,} words)[/dim]"
             )
+        if html_output:
+            out_console.print(
+                f"  {html_path}  [dim](HTML report)[/dim]"
+            )
+        if ai_path is not None or html_output:
+            out_console.print()
         if show_diff:
             render_diff(report, console=out_console)
         if show_raw_hits:
