@@ -98,12 +98,14 @@ def _classify_gap(
         return GapKind.BLOCKED
     raw_ok = raw_presence_score >= (1 - MATERIAL_THRESHOLD)
     ext_ok = visibility_score >= (1 - MATERIAL_THRESHOLD)
-    if raw_ok and ext_ok:
+    # If the extractor already recovers most content, there is no
+    # actionable visibility gap — regardless of raw_presence_score
+    # (which may be low due to sentence-splitting artifacts on pages
+    # with lists, tables, or non-standard punctuation).
+    if ext_ok:
         return GapKind.NONE
-    if not ext_ok and raw_ok:
+    if raw_ok:
         return GapKind.EXTRACTION
-    if not raw_ok and ext_ok:
-        return GapKind.MIXED
     # Both scores below threshold. Distinguish: if raw bytes contain
     # notably more than what the extractor sees, it's a mix of both
     # extraction failure and rendering failure. If they're roughly

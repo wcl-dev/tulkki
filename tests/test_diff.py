@@ -173,10 +173,12 @@ def test_gap_classification_mixed_both_low_but_raw_higher() -> None:
     assert _classify_gap(0.40, 0.05, 200, 200) == GapKind.MIXED
 
 
-def test_gap_classification_mixed_raw_low_vis_ok() -> None:
-    """Raw bytes low but visibility OK → GapKind.MIXED (rare edge case
-    where extractor sees more than raw bytes search)."""
-    assert _classify_gap(0.50, 0.95, 200, 200) == GapKind.MIXED
+def test_gap_classification_none_when_vis_ok_regardless_of_raw() -> None:
+    """When visibility is high (extractor recovers content), gap_kind is
+    NONE regardless of raw_presence_score. A low raw_presence on a page
+    with 100% visibility is a sentence-splitting artifact, not a real gap."""
+    assert _classify_gap(0.50, 0.95, 200, 200) == GapKind.NONE
+    assert _classify_gap(0.30, 1.00, 200, 200) == GapKind.NONE
 
 
 def test_gap_classification_blocked_on_403() -> None:
