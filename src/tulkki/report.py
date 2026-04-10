@@ -10,15 +10,14 @@ from __future__ import annotations
 import difflib
 import html as html_mod
 import json
-from dataclasses import asdict
-from datetime import datetime
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from .types import FetchResult, GapKind, VisibilityReport
+from .descriptions import METRIC_HELP_PLAIN
+from .types import GapKind, VisibilityReport
 
 
 def _status_warning(raw_status: int, render_status: int) -> str | None:
@@ -64,19 +63,24 @@ def _format_bytes(n: int) -> str:
     return f"{n / (1024 * 1024):.2f} MB"
 
 
+_SCORE_BANDS: list[tuple[float, str, str]] = [
+    (0.85, "green", "#22c55e"),
+    (0.50, "yellow", "#eab308"),
+    (0.00, "red", "#ef4444"),
+]
+
+
 def _score_color(score: float) -> str:
-    if score >= 0.85:
-        return "green"
-    if score >= 0.5:
-        return "yellow"
+    for threshold, name, _ in _SCORE_BANDS:
+        if score >= threshold:
+            return name
     return "red"
 
 
 def _score_color_hex(score: float) -> str:
-    if score >= 0.85:
-        return "#22c55e"
-    if score >= 0.5:
-        return "#eab308"
+    for threshold, _, hex_val in _SCORE_BANDS:
+        if score >= threshold:
+            return hex_val
     return "#ef4444"
 
 
@@ -390,16 +394,17 @@ def _render_condensed_diff(
     )
 
     shown = 0
+    total_printable = 0
     for line in diff_lines:
-        if shown >= max_lines:
-            break
         # Skip the --- / +++ header in condensed mode
         if line.startswith("---") or line.startswith("+++"):
             continue
-        _print_diff_line(line, console)
-        shown += 1
+        total_printable += 1
+        if shown < max_lines:
+            _print_diff_line(line, console)
+            shown += 1
 
-    remaining = len(diff_lines) - max_lines
+    remaining = total_printable - shown
     if remaining > 0:
         console.print(
             f"  [dim]... {remaining} more lines. "
@@ -482,31 +487,56 @@ def render_raw_hits(
 
 # --- HTML report -------------------------------------------------------------
 
-_METRIC_HELP = {
-    "raw_html_coverage": (
-        "Raw HTML coverage measures what fraction of the human-visible "
-        "content can be found as literal text inside the raw HTML bytes "
-        "(before any JavaScript runs). This represents the upper bound of "
-        "what any AI crawler could possibly see — including training "
-        "pipelines that tokenize raw HTML directly."
-    ),
-    "extractor_visibility": (
-        "Extractor visibility measures what fraction of the human-visible "
-        "content is recovered by a standard boilerplate-stripping extractor "
-        "(trafilatura). This represents what tools like Common Crawl's WET "
-        "files, readability.js, and most content-extraction pipelines would "
-        "actually see."
-    ),
-    "gap_kind": (
-        "Gap kind classifies why content is missing. "
-        "'NONE' = AI sees everything. "
-        "'EXTRACTION' = content is in the HTML bytes but extractors can't "
-        "unpack it (e.g. locked inside framework data structures). "
-        "'RENDERING' = content only exists after JavaScript execution. "
-        "'MIXED' = both problems are present. "
-        "'BLOCKED' = HTTP error, scores are meaningless."
-    ),
-}
+_HTML_CSS = """\
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155;
+           --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e;
+           --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif;
+          background: var(--bg); color: var(--text); padding: 2rem;
+          max-width: 960px; margin: 0 auto; line-height: 1.6; }
+  h1 { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--cyan); }
+  h3 { font-size: 0.9rem; margin: 1rem 0 0.5rem; }
+  .url { font-size: 0.85rem; color: var(--cyan); word-break: break-all; }
+  .card { background: var(--card); border: 1px solid var(--border);
+           border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .scores { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .score-box { text-align: center; padding: 1rem; border-radius: 6px;
+                background: var(--bg); }
+  .score-box .number { font-size: 2rem; font-weight: 700; }
+  .score-box .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .help { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem;
+           border-left: 2px solid var(--border); padding-left: 0.75rem; }
+  .tag { display: inline-block; background: var(--border); color: var(--text);
+          padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
+          margin: 0.5rem 0; }
+  .gap-kind { font-size: 1.1rem; font-weight: 600; }
+  .interp { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+  .warning { background: #451a1a; border: 1px solid var(--red);
+              border-radius: 6px; padding: 0.75rem; margin: 1rem 0;
+              font-size: 0.85rem; color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left;
+            border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .missing { list-style: none; padding: 0; }
+  .missing li::before { content: "\\2717 "; color: var(--red); }
+  .missing li { margin: 0.25rem 0; font-size: 0.85rem; }
+  .diff { background: var(--bg); border-radius: 6px; padding: 1rem;
+           font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
+           overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--cyan); margin-top: 0.5rem; }
+  .diff-meta { color: var(--muted); font-weight: 600; }
+  .diff-ctx { color: var(--muted); }
+  .meta { font-size: 0.8rem; color: var(--muted); }
+  footer { margin-top: 2rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--muted); }"""
 
 
 def render_html(report: VisibilityReport) -> str:
@@ -565,6 +595,8 @@ def render_html(report: VisibilityReport) -> str:
 
     gap_color = "#22c55e" if report.gap_kind == GapKind.NONE else "#eab308"
 
+    css = _HTML_CSS  # defined above as a plain string (no f-string escaping)
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -572,55 +604,7 @@ def render_html(report: VisibilityReport) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tulkki report — {e(report.url)}</title>
 <style>
-  :root {{ --bg: #0f172a; --card: #1e293b; --border: #334155;
-           --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e;
-           --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }}
-  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: system-ui, -apple-system, sans-serif;
-          background: var(--bg); color: var(--text); padding: 2rem;
-          max-width: 960px; margin: 0 auto; line-height: 1.6; }}
-  h1 {{ font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }}
-  h2 {{ font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--cyan); }}
-  h3 {{ font-size: 0.9rem; margin: 1rem 0 0.5rem; }}
-  .url {{ font-size: 0.85rem; color: var(--cyan); word-break: break-all; }}
-  .card {{ background: var(--card); border: 1px solid var(--border);
-           border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }}
-  .scores {{ display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }}
-  .score-box {{ text-align: center; padding: 1rem; border-radius: 6px;
-                background: var(--bg); }}
-  .score-box .number {{ font-size: 2rem; font-weight: 700; }}
-  .score-box .label {{ font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }}
-  .help {{ font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem;
-           border-left: 2px solid var(--border); padding-left: 0.75rem; }}
-  .tag {{ display: inline-block; background: var(--border); color: var(--text);
-          padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
-          margin: 0.5rem 0; }}
-  .gap-kind {{ font-size: 1.1rem; font-weight: 600; }}
-  .interp {{ color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }}
-  .warning {{ background: #451a1a; border: 1px solid var(--red);
-              border-radius: 6px; padding: 0.75rem; margin: 1rem 0;
-              font-size: 0.85rem; color: var(--red); }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 0.85rem; }}
-  th, td {{ padding: 0.5rem 0.75rem; text-align: left;
-            border-bottom: 1px solid var(--border); }}
-  th {{ color: var(--muted); font-weight: 600; }}
-  td.num {{ text-align: right; font-variant-numeric: tabular-nums; }}
-  .muted {{ color: var(--muted); }}
-  .missing {{ list-style: none; padding: 0; }}
-  .missing li::before {{ content: "\\2717 "; color: var(--red); }}
-  .missing li {{ margin: 0.25rem 0; font-size: 0.85rem; }}
-  .diff {{ background: var(--bg); border-radius: 6px; padding: 1rem;
-           font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
-           overflow-x: auto; max-height: 600px; overflow-y: auto; }}
-  .diff-add {{ color: var(--green); }}
-  .diff-del {{ color: var(--red); }}
-  .diff-hunk {{ color: var(--cyan); margin-top: 0.5rem; }}
-  .diff-meta {{ color: var(--muted); font-weight: 600; }}
-  .diff-ctx {{ color: var(--muted); }}
-  .meta {{ font-size: 0.8rem; color: var(--muted); }}
-  footer {{ margin-top: 2rem; padding-top: 1rem;
-            border-top: 1px solid var(--border);
-            font-size: 0.75rem; color: var(--muted); }}
+{css}
 </style>
 </head>
 <body>
@@ -643,19 +627,19 @@ def render_html(report: VisibilityReport) -> str:
   <div class="score-box card">
     <div class="number" style="color: {_score_color_hex(report.raw_presence_score)}">{rp_pct:.1f}%</div>
     <div class="label">Raw HTML coverage</div>
-    <div class="help">{e(_METRIC_HELP['raw_html_coverage'])}</div>
+    <div class="help">{e(METRIC_HELP_PLAIN['raw_html_coverage'])}</div>
   </div>
   <div class="score-box card">
     <div class="number" style="color: {_score_color_hex(report.visibility_score)}">{vis_pct:.1f}%</div>
     <div class="label">Extractor visibility</div>
-    <div class="help">{e(_METRIC_HELP['extractor_visibility'])}</div>
+    <div class="help">{e(METRIC_HELP_PLAIN['extractor_visibility'])}</div>
   </div>
 </div>
 
 <div class="card">
   <div class="gap-kind" style="color: {gap_color}">{report.gap_kind.value.upper()}</div>
   <div class="interp">{e(interp)}</div>
-  <div class="help" style="margin-top: 0.75rem">{e(_METRIC_HELP['gap_kind'])}</div>
+  <div class="help" style="margin-top: 0.75rem">{e(METRIC_HELP_PLAIN['gap_kind'])}</div>
 </div>
 
 <h2>Views comparison</h2>
@@ -709,7 +693,7 @@ def render_html(report: VisibilityReport) -> str:
 
 <footer>
   Generated by <strong>tulkki {e(report.fetched_at.strftime('%Y-%m-%d %H:%M UTC'))}</strong>
-  &middot; <a href="https://github.com/anthropics/tulkki" style="color: var(--cyan)">github.com/anthropics/tulkki</a>
+  &middot; <a href="https://github.com/tulkki-dev/tulkki" style="color: var(--cyan)">github.com/tulkki-dev/tulkki</a>
 </footer>
 
 </body>

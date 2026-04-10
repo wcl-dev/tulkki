@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -208,3 +209,51 @@ def test_cli_show_diff_still_works() -> None:
         )
     assert result.exit_code == 0
     assert "Content diff" in result.output
+
+
+def test_cli_html_output_creates_file(tmp_path: Path) -> None:
+    """--html should create a .html report file in the output directory."""
+    p1, p2 = _patch_fetchers()
+    with p1, p2:
+        result = runner.invoke(
+            app,
+            [
+                "check", "https://example.com",
+                "--html", "--no-save",
+                "--out", str(tmp_path),
+            ],
+        )
+    assert result.exit_code == 0
+    html_files = list(tmp_path.glob("*_report.html"))
+    assert len(html_files) == 1
+    content = html_files[0].read_text(encoding="utf-8")
+    assert "tulkki visibility report" in content
+    assert "Raw HTML coverage" in content
+
+
+def test_cli_html_no_save_still_works(tmp_path: Path) -> None:
+    """--html --no-save should create the HTML report but not markdown files."""
+    p1, p2 = _patch_fetchers()
+    with p1, p2:
+        result = runner.invoke(
+            app,
+            [
+                "check", "https://example.com",
+                "--html", "--no-save",
+                "--out", str(tmp_path),
+            ],
+        )
+    assert result.exit_code == 0
+    assert list(tmp_path.glob("*_report.html"))
+    assert not list(tmp_path.glob("*_ai.md"))
+    assert not list(tmp_path.glob("*_human.md"))
+
+
+def test_cli_explain_prints_metrics() -> None:
+    """tulkki explain should print metric descriptions."""
+    result = runner.invoke(app, ["explain"])
+    assert result.exit_code == 0
+    assert "Extractor visibility" in result.output
+    assert "Raw HTML coverage" in result.output
+    assert "Gap kind" in result.output
+    assert "Framework detection" in result.output

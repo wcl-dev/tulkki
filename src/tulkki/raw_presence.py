@@ -44,28 +44,45 @@ FRAMEWORK_SIGNATURES: dict[str, str] = {
 # --- Normalization -----------------------------------------------------------
 
 
+_HAYSTACK_REPLACEMENTS = str.maketrans(
+    {
+        # JS/JSON string escapes are handled separately (multi-char)
+        # Unicode punctuation → ASCII equivalents
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2013": "-",
+        "\u2014": "-",
+    }
+)
+
+# Multi-char replacements applied in order via str.replace.
+_HAYSTACK_MULTI: list[tuple[str, str]] = [
+    ('\\"', '"'),
+    ("\\'", "'"),
+    ("\\/", "/"),
+    ("\\n", " "),
+    ("\\t", " "),
+    ("&amp;", "&"),
+    ("&quot;", '"'),
+    ("&#39;", "'"),
+    ("&apos;", "'"),
+]
+
+
 def _normalize_haystack(raw_html: str) -> str:
     """Prepare the raw HTML bytes for substring searching.
 
     Lowercase, unescape common JS/JSON string escapes and HTML entities,
-    collapse whitespace. This allows a rendered sentence like
-    ``Washington, D.C. is the capital`` to match RSC flight data that
-    stores it as ``\\"Washington, D.C. is the capital\\"``.
+    normalize Unicode punctuation, and collapse whitespace. This allows a
+    rendered sentence like ``Washington, D.C. is the capital`` to match
+    RSC flight data that stores it as ``\\"Washington, D.C. is the capital\\"``.
     """
     s = raw_html.lower()
-    # JS/JSON string escapes
-    s = s.replace('\\"', '"').replace("\\'", "'").replace("\\/", "/")
-    s = s.replace("\\n", " ").replace("\\t", " ")
-    # Common HTML entities that appear in free text
-    s = s.replace("&amp;", "&").replace("&quot;", '"')
-    s = s.replace("&#39;", "'").replace("&apos;", "'")
-    # Normalize Unicode punctuation to ASCII equivalents so that
-    # trafilatura's output (which may use curly quotes) matches the
-    # raw HTML (which typically uses straight quotes or escapes).
-    s = s.replace("\u2018", "'").replace("\u2019", "'")  # ' '
-    s = s.replace("\u201c", '"').replace("\u201d", '"')  # " "
-    s = s.replace("\u2013", "-").replace("\u2014", "-")  # – —
-    # Collapse whitespace
+    for old, new in _HAYSTACK_MULTI:
+        s = s.replace(old, new)
+    s = s.translate(_HAYSTACK_REPLACEMENTS)
     s = re.sub(r"\s+", " ", s)
     return s
 
@@ -88,6 +105,13 @@ def _sentences(markdown: str) -> list[str]:
     Strips markdown syntax, splits on sentence boundaries, and drops
     fragments shorter than MIN_SENTENCE_CHARS to avoid false positives
     from boilerplate like "OK.", "Learn more", or nav items.
+
+    .. note:: CJK limitation
+       The sentence-boundary regex assumes Latin punctuation (.!?) followed
+       by a capital letter. Chinese, Japanese, and Korean text uses different
+       sentence-ending punctuation (。！？) and has no uppercase/lowercase
+       distinction. CJK support requires a different splitting strategy
+       and is tracked for v0.2.1 alongside the CJK word-count fix.
     """
     text = re.sub(r"[#*_`>\[\]()!]", " ", markdown)
     text = re.sub(r"\s+", " ", text).strip()

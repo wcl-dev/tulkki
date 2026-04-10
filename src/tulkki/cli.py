@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from typing import Optional
@@ -23,6 +24,7 @@ for _stream in (sys.stdout, sys.stderr):
             pass
 
 from .backends import get_raw_fetcher, get_rendering_fetcher
+from . import descriptions as desc
 from .diff import compare
 from .extractor import TrafilaturaExtractor
 from .report import render_diff, render_html, render_json, render_raw_hits, render_terminal
@@ -52,70 +54,38 @@ def explain() -> None:
     console.rule("[bold]tulkki metrics explained[/bold]")
     console.print()
 
+    # Rich markup wrappers around the shared plain-text descriptions.
+    # The source of truth is descriptions.py; we add [bold]/[green] here.
     sections = [
         (
             "Extractor visibility  (visibility_score)",
-            "What fraction of the human-visible content a standard extractor "
-            "(trafilatura) can recover from the raw HTML — without running "
-            "JavaScript.\n\n"
-            "This represents what Common Crawl WET files, readability.js, "
-            "and most content-extraction pipelines would actually see. If "
-            "your page scores 100%, tools that strip HTML boilerplate can "
-            "already read everything. If it scores 5%, they see almost "
-            "nothing.\n\n"
-            "[bold]This is the number that --fail-below checks.[/bold]",
+            desc.EXTRACTOR_VISIBILITY.replace(
+                "This is the number that --fail-below checks.",
+                "[bold]This is the number that --fail-below checks.[/bold]",
+            ),
         ),
         (
             "Raw HTML coverage  (raw_presence_score)",
-            "What fraction of the human-visible content can be found as "
-            "literal text inside the raw HTML bytes — before any extraction "
-            "or JavaScript.\n\n"
-            "This is the upper bound of what any AI crawler could possibly "
-            "see, including training pipelines that tokenize raw HTML "
-            "directly (script tags included). A high number means the "
-            "content IS in the bytes; a low number means it genuinely "
-            "requires JavaScript to appear.\n\n"
-            "[bold]This is the number that --fail-below-raw checks.[/bold]",
+            desc.RAW_HTML_COVERAGE.replace(
+                "This is the number that --fail-below-raw checks.",
+                "[bold]This is the number that --fail-below-raw checks.[/bold]",
+            ),
         ),
         (
             "Gap kind",
-            "[green]NONE[/green] — Both scores are high. AI crawlers see "
-            "the same content as human users. No action needed.\n\n"
-            "[yellow]EXTRACTION[/yellow] — Content is physically present in "
-            "the raw HTML bytes (high raw coverage) but standard extractors "
-            "cannot unpack it (low extractor visibility). Typical cause: "
-            "content locked inside framework data structures like Next.js "
-            "RSC flight data. LLMs trained on raw HTML may see it; LLMs "
-            "trained on Common Crawl WET will not.\n\n"
-            "[yellow]RENDERING[/yellow] — Content is genuinely absent from "
-            "the raw HTML (low raw coverage) and only appears after "
-            "JavaScript execution. This is classic client-side rendering. "
-            "No AI crawler that skips JS will see it.\n\n"
-            "[yellow]MIXED[/yellow] — Both extraction and rendering gaps "
-            "are present. Some content is locked in framework data "
-            "structures, and some is truly client-rendered.\n\n"
-            "[red]BLOCKED[/red] — One or both HTTP fetches returned an "
-            "error (403, 401, 5xx, timeout). Scores are meaningless.",
+            desc.GAP_KIND_DETAILED.replace("NONE", "[green]NONE[/green]", 1)
+            .replace("EXTRACTION", "[yellow]EXTRACTION[/yellow]", 1)
+            .replace("RENDERING", "[yellow]RENDERING[/yellow]", 1)
+            .replace("MIXED", "[yellow]MIXED[/yellow]", 1)
+            .replace("BLOCKED", "[red]BLOCKED[/red]", 1),
         ),
         (
             "Content diff  (--show-diff)",
-            "A line-by-line comparison of the AI-extracted markdown versus "
-            "the human-extracted markdown.\n\n"
-            "[green]Green lines[/green] = content visible to humans but "
-            "not to AI (the visibility gap).\n"
-            "[red]Red lines[/red] = content visible to AI but not humans "
-            "(usually extraction noise — rare).\n\n"
-            "The main report shows a condensed preview (first 15 lines). "
-            "Use --show-diff to see the full diff.",
+            desc.CONTENT_DIFF.replace(
+                "Green lines", "[green]Green lines[/green]"
+            ).replace("Red lines", "[red]Red lines[/red]"),
         ),
-        (
-            "Framework detection",
-            "tulkki scans the raw HTML for signatures of common JavaScript "
-            "frameworks (Next.js RSC, Next.js Pages, Nuxt, SvelteKit, "
-            "Gatsby, Remix). When detected, the interpretation paragraph "
-            "names the specific framework so you know exactly what kind of "
-            "packaging is hiding the content.",
-        ),
+        ("Framework detection", desc.FRAMEWORK_DETECTION),
     ]
 
     for title, body in sections:
@@ -136,7 +106,10 @@ def _slug(url: str) -> str:
     parsed = urlparse(url)
     host = parsed.netloc.replace(":", "_") or "page"
     path = parsed.path.strip("/").replace("/", "_") or "index"
-    slug = f"{host}_{path}"
+    # Include a short hash of the full URL (with query/fragment) so that
+    # different URLs under the same host+path don't overwrite each other.
+    url_hash = hashlib.sha1(url.encode()).hexdigest()[:8]
+    slug = f"{host}_{path}_{url_hash}"
     # Keep filenames sane
     return slug[:80].rstrip("._")
 
@@ -253,6 +226,7 @@ def check(
     else:
         ai_path = human_path = None
 
+    html_path: Path | None = None
     if html_output:
         out.mkdir(parents=True, exist_ok=True)
         html_path = out / f"{_slug(url)}_report.html"

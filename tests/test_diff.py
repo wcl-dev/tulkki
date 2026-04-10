@@ -189,3 +189,11 @@ def test_gap_classification_blocked_on_403() -> None:
 def test_gap_classification_blocked_on_zero_status() -> None:
     """Status 0 (network error) → GapKind.BLOCKED."""
     assert _classify_gap(0.95, 0.95, 0, 200) == GapKind.BLOCKED
+
+
+def test_raw_presence_score_equals_sentence_coverage() -> None:
+    """The top-level raw_presence_score must always equal
+    raw_presence.sentence_coverage (it's a convenience alias)."""
+    doc = _doc(100, [Heading(1, "Hello")])
+    report = compare(_fetch(), _fetch(), doc, doc)
+    assert report.raw_presence_score == report.raw_presence.sentence_coverage
