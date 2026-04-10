@@ -1,10 +1,10 @@
 # tulkki
 
 **An AI crawler visibility diagnostic for web pages.** A local CLI that
-fetches a URL twice — once without JavaScript (what AI crawlers see) and
+fetches a URL twice — once without JavaScript (what many crawlers see) and
 once with JavaScript (what humans see) — then tells you which sections
-are invisible to AI, with a score and two side-by-side Markdown files
-you can commit to git.
+differ, with a score and two side-by-side Markdown files you can commit to
+git.
 
 ```
 $ tulkki check https://docs.anthropic.com/en/docs/intro
@@ -33,36 +33,32 @@ Outputs saved:
 
 ## Why tulkki
 
-Google quietly cut Googlebot's HTML budget from 15 MB to 2 MB in
-February 2026. None of the major LLM crawlers (GPTBot, ClaudeBot,
-PerplexityBot, Google-Extended) execute JavaScript. If your important
-content lives behind hydration, your page is invisible to the search
-engines that are increasingly answering questions before users ever
-click.
+Major LLM and search crawlers (e.g. GPTBot, ClaudeBot, PerplexityBot,
+Google-Extended) **do not execute JavaScript**. Crawl budgets and bot
+behavior also change over time. If your important copy lives only after
+hydration or client-side rendering, automated fetches may not match what
+users see in a browser.
 
-Existing tools in this space all do one of two things:
+Other tools tend to fall into two buckets:
 
-- **Score-only hosted checkers** ([amivisibleonai](https://www.amivisibleonai.com/),
-  [llmrefs](https://llmrefs.com/tools/ai-crawl-checker), and ~6 others)
-  give you a number and recommendations. They do not show you the
-  actual content AI crawlers see, do not compare it to the rendered
-  view, and you cannot run them in a script.
-- **General URL→Markdown converters** ([crawl4ai](https://github.com/unclecode/crawl4ai),
+- **Hosted score checkers** (e.g. [amivisibleonai](https://www.amivisibleonai.com/),
+  [llmrefs](https://llmrefs.com/tools/ai-crawl-checker)) give a number and
+  tips but do not ship two comparable Markdown bodies you can diff or
+  commit.
+- **URL→Markdown libraries** ([crawl4ai](https://github.com/unclecode/crawl4ai),
   [firecrawl](https://github.com/firecrawl/firecrawl),
-  [trafilatura](https://github.com/adbar/trafilatura)) give you a
-  Markdown body but do not diff anything.
+  [trafilatura](https://github.com/adbar/trafilatura)) turn a page into
+  Markdown but do not build the **no-JS vs post-JS** pair or a visibility
+  score out of the box.
 
-tulkki is the only tool that produces **both** Markdown views and a
-diff. It is built for developers and content engineers, runs locally
-with no API keys, and outputs files you can:
+tulkki is aimed at developers and content engineers: it runs **locally**
+with **no API keys**, outputs **AI-view and human-view Markdown**, optional
+unified diff, and CI-friendly flags so you can:
 
-- Commit to a git repository
-- `diff` against a previous version to see how a change affected AI
-  visibility
-- Attach to a pull request so reviewers can see "this PR drops AI
-  visibility from 80 % to 50 %"
-- Run inside GitHub Actions / any continuous-integration pipeline,
-  using `--quiet --fail-below 80` to gate merges
+- Commit outputs to git
+- `diff` runs to see how a deploy changed crawler-visible content
+- Attach artifacts to a pull request (e.g. “visibility dropped from 80 % to 50 %”)
+- Gate merges with `--quiet --fail-below 80` (and `--fail-below-raw` when needed)
 
 ## Install
 
@@ -103,21 +99,29 @@ appear in the AI view, matched on `(level, text)`. The blend means a
 page can score below 100 % even when AI sees the same word count as
 humans, if the heading structure was lost to JavaScript hydration.
 
-## Architecture
+## Architecture (v0.1)
 
-tulkki is built on a small Protocol-based core so the heavy lifting can
-be delegated to existing tools as backends:
+tulkki uses a small Protocol-based core so fetchers and extractors can be
+swapped in code. **In this release, only the defaults below are wired end-to-end.**
 
-| Layer | Default | Optional backends |
-|---|---|---|
-| Raw fetch (AI view) | `httpx` | `hrequests` |
-| JS render (human view) | `playwright` | `patchright` |
-| Combined backend | — | `crawl4ai`, `firecrawl` |
-| Content extraction | `trafilatura` | — |
+| Layer | Implementation |
+| --- | --- |
+| Raw HTML (no JS, “AI crawler” view) | [httpx](https://www.python-httpx.org/) — `--raw-fetcher httpx` |
+| Rendered HTML (post-JS, “human” view) | [Playwright](https://playwright.dev/python/) — `--renderer playwright` |
+| Main content extraction | [trafilatura](https://github.com/adbar/trafilatura) |
 
-The default install gives you a working tool with no extra setup.
-Advanced users can install extras (`pipx install "tulkki[crawl4ai]"`)
-and switch backends with `--raw-fetcher`, `--renderer`, or `--backend`.
+The CLI exposes `--raw-fetcher` and `--renderer` so alternative backends can
+be added without changing the command surface.
+
+**Roadmap (not implemented yet):** optional raw fetchers (`hrequests`),
+renderers (`patchright`), and combined stacks (`crawl4ai`, `firecrawl`) are
+hinted at in `pyproject.toml` optional dependency groups for future work;
+choosing those names today will raise until those backends are implemented.
+There is **no** single `--backend` switch — the two sides are configured
+independently.
+
+Run `tulkki explain` for metric definitions, or `tulkki check URL --html` for a
+self-contained HTML report.
 
 ## License
 
