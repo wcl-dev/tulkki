@@ -33,19 +33,38 @@ class HttpxRawFetcher:
 
     def fetch(self, url: str) -> FetchResult:
         started = time.perf_counter()
-        with httpx.Client(
-            follow_redirects=True,
-            timeout=self._timeout,
-            headers={"User-Agent": self._user_agent, "Accept": "text/html,*/*"},
-        ) as client:
-            resp = client.get(url)
+        # Wrap the request in a try/except so that DNS failures, TLS errors,
+        # connection resets, and timeouts produce a degenerate FetchResult
+        # with status_code=0 instead of crashing the CLI with a traceback.
+        # _status_warning() in report.py already handles status 0 as
+        # "timeout / network error", so the downstream UX is consistent.
+        try:
+            with httpx.Client(
+                follow_redirects=True,
+                timeout=self._timeout,
+                headers={
+                    "User-Agent": self._user_agent,
+                    "Accept": "text/html,*/*",
+                },
+            ) as client:
+                resp = client.get(url)
+            final_url = str(resp.url)
+            html = resp.text
+            status_code = resp.status_code
+            bytes_size = len(resp.content)
+        except httpx.RequestError:
+            final_url = url
+            html = ""
+            status_code = 0
+            bytes_size = 0
+
         elapsed_ms = int((time.perf_counter() - started) * 1000)
 
         return FetchResult(
-            url=str(resp.url),
-            html=resp.text,
-            status_code=resp.status_code,
-            bytes_size=len(resp.content),
+            url=final_url,
+            html=html,
+            status_code=status_code,
+            bytes_size=bytes_size,
             fetched_at=datetime.now(timezone.utc),
             elapsed_ms=elapsed_ms,
             backend=self.name,

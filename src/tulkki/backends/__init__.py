@@ -24,15 +24,21 @@ def _make_playwright_render() -> Fetcher:
 
 
 def _make_hrequests_raw() -> Fetcher:
-    from .hrequests_raw import HrequestsRawFetcher
-
-    return HrequestsRawFetcher()
+    raise NotImplementedError(
+        "The 'hrequests' raw fetcher is declared in pyproject.toml as an "
+        "optional extra but is not yet implemented in tulkki v0.1. "
+        "Coming in a future release. Use the default '--raw-fetcher httpx' "
+        "for now."
+    )
 
 
 def _make_patchright_render() -> Fetcher:
-    from .patchright_render import PatchrightRenderer
-
-    return PatchrightRenderer()
+    raise NotImplementedError(
+        "The 'patchright' renderer is declared in pyproject.toml as an "
+        "optional extra but is not yet implemented in tulkki v0.1. "
+        "Coming in a future release. Use the default '--renderer playwright' "
+        "for now."
+    )
 
 
 _RAW_REGISTRY: dict[str, Callable[[], Fetcher]] = {

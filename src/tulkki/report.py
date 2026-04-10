@@ -1,11 +1,13 @@
-"""Report rendering — terminal (rich) and JSON.
+"""Report rendering — terminal (rich), JSON, and unified diff.
 
 Pure presentation layer. Takes a VisibilityReport and produces either
-human-readable terminal output or a machine-readable JSON dict.
+human-readable terminal output, a machine-readable JSON dict, or a
+coloured unified diff of the AI view vs the human view.
 """
 
 from __future__ import annotations
 
+import difflib
 import json
 from dataclasses import asdict
 from datetime import datetime
@@ -179,3 +181,61 @@ def to_dict(report: VisibilityReport) -> dict[str, Any]:
 
 def render_json(report: VisibilityReport) -> str:
     return json.dumps(to_dict(report), indent=2, ensure_ascii=False)
+
+
+def render_diff(report: VisibilityReport, console: Console | None = None) -> None:
+    """Print a coloured unified diff of the AI view vs the human view.
+
+    Green lines are present in the human view but not in the AI view
+    (= what AI crawlers miss). Red lines are present in the AI view but
+    not in the human view (usually trafilatura extraction noise, rare).
+    This gives users a direct answer to "what exactly is the AI missing?"
+    without forcing them to open both markdown files in an external diff
+    viewer.
+    """
+    console = console or Console()
+
+    ai_lines = report.ai_doc.markdown.splitlines()
+    human_lines = report.human_doc.markdown.splitlines()
+
+    diff_lines = list(
+        difflib.unified_diff(
+            ai_lines,
+            human_lines,
+            fromfile="ai_view.md",
+            tofile="human_view.md",
+            lineterm="",
+            n=2,
+        )
+    )
+
+    console.print()
+    console.rule("[bold]Content diff[/bold]  [dim](AI view → Human view)[/dim]")
+    console.print()
+
+    if not diff_lines:
+        console.print(
+            "[dim]No textual difference between the AI and human views.[/dim]"
+        )
+        console.print()
+        return
+
+    for line in diff_lines:
+        if line.startswith("+++") or line.startswith("---"):
+            console.print(f"[bold]{line}[/bold]", highlight=False)
+        elif line.startswith("@@"):
+            console.print(f"[cyan]{line}[/cyan]", highlight=False)
+        elif line.startswith("+"):
+            console.print(f"[green]{line}[/green]", highlight=False)
+        elif line.startswith("-"):
+            console.print(f"[red]{line}[/red]", highlight=False)
+        else:
+            console.print(f"[dim]{line}[/dim]", highlight=False)
+
+    console.print()
+    console.print(
+        "[dim]Legend: [green]green[/green] = visible to humans but not AI "
+        "(the visibility gap). [red]red[/red] = visible to AI but not "
+        "humans (usually extraction noise).[/dim]"
+    )
+    console.print()

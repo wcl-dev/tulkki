@@ -25,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
 from .backends import get_raw_fetcher, get_rendering_fetcher
 from .diff import compare
 from .extractor import TrafilaturaExtractor
-from .report import render_json, render_terminal
+from .report import render_diff, render_json, render_terminal
 from .types import VisibilityReport
 
 app = typer.Typer(
@@ -103,18 +103,24 @@ def check(
     no_save: bool = typer.Option(
         False, "--no-save", help="Don't write markdown files to disk."
     ),
+    show_diff: bool = typer.Option(
+        False,
+        "--show-diff",
+        help="Print a unified diff of the AI view vs the human view "
+        "after the report.",
+    ),
 ) -> None:
     """Diagnose how much of a page is invisible to AI crawlers."""
 
-    console = Console(stderr=quiet)  # quiet → status to stderr only
+    # Status messages go to stderr so that --json / --quiet stdout stays
+    # clean for pipes. The main report goes to stdout via out_console.
     err = Console(stderr=True)
+    out_console = Console()
     extractor = TrafilaturaExtractor()
 
     raw = get_raw_fetcher(raw_fetcher)
     if not quiet and not json_output:
-        err.print(
-            f"[dim]-> raw fetch ({raw.name})...[/dim]", highlight=False
-        )
+        err.print(f"[dim]-> raw fetch ({raw.name})...[/dim]", highlight=False)
     raw_result = raw.fetch(url)
     ai_doc = extractor.extract(raw_result.html, url=url)
 
@@ -127,7 +133,8 @@ def check(
         rend = get_rendering_fetcher(renderer)
         if not quiet and not json_output:
             err.print(
-                f"[dim]-> rendered fetch ({rend.name})...[/dim]", highlight=False
+                f"[dim]-> rendered fetch ({rend.name})...[/dim]",
+                highlight=False,
             )
         rendered_result = rend.fetch(url)
         human_doc = extractor.extract(rendered_result.html, url=url)
@@ -144,13 +151,15 @@ def check(
     elif quiet:
         typer.echo(f"{report.visibility_score * 100:.1f}")
     else:
-        render_terminal(report, console=Console())
+        render_terminal(report, console=out_console)
         if ai_path is not None and human_path is not None:
-            Console().print(
+            out_console.print(
                 f"[dim]Outputs saved:[/dim]\n"
                 f"  {ai_path}    [dim]({report.ai_doc.word_count:,} words)[/dim]\n"
                 f"  {human_path}  [dim]({report.human_doc.word_count:,} words)[/dim]\n"
             )
+        if show_diff:
+            render_diff(report, console=out_console)
 
     if fail_below is not None and report.visibility_score * 100 < fail_below:
         raise typer.Exit(code=1)

@@ -56,8 +56,25 @@ def _visibility_score(ai_doc: ExtractedDoc, human_doc: ExtractedDoc) -> float:
 def _missing_headings(
     ai_doc: ExtractedDoc, human_doc: ExtractedDoc
 ) -> tuple[Heading, ...]:
+    """Return the headings the human sees but the AI does not.
+
+    The human side is deduplicated on `(level, text)` so that a page which
+    legitimately repeats the same heading (e.g. "Anecdotes from our teams"
+    appearing four times on the OpenAI Codex page) is not reported as
+    "missing" for any of the duplicates when the AI sees at least one.
+    This keeps `_missing_headings` consistent with `_heading_coverage`,
+    which also works on the deduplicated set.
+    """
     ai_set = ai_doc.heading_set
-    return tuple(h for h in human_doc.headings if (h.level, h.text) not in ai_set)
+    seen: set[tuple[int, str]] = set()
+    missing: list[Heading] = []
+    for h in human_doc.headings:
+        key = (h.level, h.text)
+        if key in ai_set or key in seen:
+            continue
+        seen.add(key)
+        missing.append(h)
+    return tuple(missing)
 
 
 def compare(

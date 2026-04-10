@@ -119,3 +119,26 @@ def test_repeated_headings_do_not_penalise_score() -> None:
     report = compare(_fetch(), _fetch(), ai, human)
     assert report.visibility_score == pytest.approx(1.0)
     assert report.missing_headings == ()
+
+
+def test_missing_headings_are_deduplicated() -> None:
+    """A heading that repeats on the human side must only appear once in
+    `missing_headings`, and only if the AI side does not see it at all.
+    This keeps the report consistent with `_heading_coverage`, which also
+    operates on the deduplicated set."""
+    human_headings = [
+        Heading(1, "Main"),
+        Heading(2, "Repeated"),
+        Heading(2, "Repeated"),
+        Heading(2, "Repeated"),
+        Heading(2, "Unique"),
+    ]
+    # AI sees only the h1
+    ai = _doc(100, [Heading(1, "Main")])
+    human = _doc(100, human_headings)
+    report = compare(_fetch(), _fetch(), ai, human)
+
+    # Two unique headings are missing, not four
+    assert len(report.missing_headings) == 2
+    missing_texts = [h.text for h in report.missing_headings]
+    assert missing_texts == ["Repeated", "Unique"]
