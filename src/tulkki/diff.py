@@ -16,7 +16,8 @@ but structure loss still moves the needle.
 
 from __future__ import annotations
 
-from .types import ExtractedDoc, FetchResult, Heading, VisibilityReport
+from .raw_presence import analyze as _analyze_raw_presence
+from .types import ExtractedDoc, FetchResult, GapKind, Heading, VisibilityReport
 
 WORD_WEIGHT = 0.7
 HEADING_WEIGHT = 0.3
@@ -77,12 +78,49 @@ def _missing_headings(
     return tuple(missing)
 
 
+MATERIAL_THRESHOLD = 0.15  # a gap >= 15% is considered material
+
+
+def _classify_gap(
+    raw_presence_score: float,
+    visibility_score: float,
+    raw_status: int,
+    render_status: int,
+) -> GapKind:
+    """Classify the nature of the visibility gap.
+
+    Uses the two scores and HTTP statuses to determine whether content
+    loss is due to extraction failure (content in bytes but extractors
+    miss it), rendering failure (content only exists post-JS), both, or
+    neither.
+    """
+    if raw_status >= 400 or render_status >= 400 or raw_status == 0:
+        return GapKind.BLOCKED
+    raw_ok = raw_presence_score >= (1 - MATERIAL_THRESHOLD)
+    ext_ok = visibility_score >= (1 - MATERIAL_THRESHOLD)
+    if raw_ok and ext_ok:
+        return GapKind.NONE
+    if not ext_ok and raw_ok:
+        return GapKind.EXTRACTION
+    if not raw_ok and ext_ok:
+        return GapKind.MIXED
+    return GapKind.RENDERING
+
+
 def compare(
     raw_fetch: FetchResult,
     rendered_fetch: FetchResult,
     ai_doc: ExtractedDoc,
     human_doc: ExtractedDoc,
 ) -> VisibilityReport:
+    vis_score = _visibility_score(ai_doc, human_doc)
+    raw_presence = _analyze_raw_presence(raw_fetch.html, human_doc)
+    rp_score = raw_presence.sentence_coverage
+    gap_kind = _classify_gap(
+        rp_score, vis_score,
+        raw_fetch.status_code, rendered_fetch.status_code,
+    )
+
     return VisibilityReport(
         url=rendered_fetch.url,
         fetched_at=rendered_fetch.fetched_at,
@@ -94,8 +132,11 @@ def compare(
         render_backend=rendered_fetch.backend,
         raw_status=raw_fetch.status_code,
         render_status=rendered_fetch.status_code,
-        visibility_score=_visibility_score(ai_doc, human_doc),
+        visibility_score=vis_score,
         missing_headings=_missing_headings(ai_doc, human_doc),
         elapsed_raw_ms=raw_fetch.elapsed_ms,
         elapsed_render_ms=rendered_fetch.elapsed_ms,
+        raw_presence=raw_presence,
+        raw_presence_score=rp_score,
+        gap_kind=gap_kind,
     )

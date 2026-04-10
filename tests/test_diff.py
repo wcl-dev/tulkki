@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from tulkki.diff import compare
-from tulkki.types import ExtractedDoc, FetchResult, Heading
+from tulkki.diff import _classify_gap, compare
+from tulkki.types import ExtractedDoc, FetchResult, GapKind, Heading
 
 
 def _doc(words: int, headings: list[Heading] | None = None) -> ExtractedDoc:
@@ -142,3 +142,38 @@ def test_missing_headings_are_deduplicated() -> None:
     assert len(report.missing_headings) == 2
     missing_texts = [h.text for h in report.missing_headings]
     assert missing_texts == ["Repeated", "Unique"]
+
+
+# --- Gap classification tests ------------------------------------------------
+
+
+def test_gap_classification_none() -> None:
+    """Both scores high → GapKind.NONE."""
+    assert _classify_gap(0.95, 0.90, 200, 200) == GapKind.NONE
+
+
+def test_gap_classification_extraction() -> None:
+    """Raw bytes contain the content (high) but extractor misses it (low)
+    → GapKind.EXTRACTION. This is the Anthropic Economic Index pattern."""
+    assert _classify_gap(0.96, 0.05, 200, 200) == GapKind.EXTRACTION
+
+
+def test_gap_classification_rendering() -> None:
+    """Both scores low → content not in raw bytes AND not extracted
+    → GapKind.RENDERING (true CSR)."""
+    assert _classify_gap(0.10, 0.10, 200, 200) == GapKind.RENDERING
+
+
+def test_gap_classification_mixed() -> None:
+    """Raw bytes low but visibility OK → GapKind.MIXED (rare edge case)."""
+    assert _classify_gap(0.50, 0.95, 200, 200) == GapKind.MIXED
+
+
+def test_gap_classification_blocked_on_403() -> None:
+    """HTTP 403 on raw side → GapKind.BLOCKED regardless of scores."""
+    assert _classify_gap(0.95, 0.95, 403, 200) == GapKind.BLOCKED
+
+
+def test_gap_classification_blocked_on_zero_status() -> None:
+    """Status 0 (network error) → GapKind.BLOCKED."""
+    assert _classify_gap(0.95, 0.95, 0, 200) == GapKind.BLOCKED
