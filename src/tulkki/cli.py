@@ -25,7 +25,7 @@ for _stream in (sys.stdout, sys.stderr):
 from .backends import get_raw_fetcher, get_rendering_fetcher
 from .diff import compare
 from .extractor import TrafilaturaExtractor
-from .report import render_diff, render_json, render_terminal
+from .report import render_diff, render_json, render_raw_hits, render_terminal
 from .types import VisibilityReport
 
 app = typer.Typer(
@@ -109,6 +109,19 @@ def check(
         help="Print a unified diff of the AI view vs the human view "
         "after the report.",
     ),
+    fail_below_raw: Optional[float] = typer.Option(
+        None,
+        "--fail-below-raw",
+        help="Exit non-zero if raw_presence_score (0–100) is below this "
+        "threshold. Use alongside --fail-below to catch both extraction-gap "
+        "and rendering-gap regressions in CI.",
+    ),
+    show_raw_hits: bool = typer.Option(
+        False,
+        "--show-raw-hits",
+        help="Print up to 20 rendered sentences absent from the raw HTML "
+        "bytes (the rendering-gap content).",
+    ),
 ) -> None:
     """Diagnose how much of a page is invisible to AI crawlers."""
 
@@ -160,9 +173,16 @@ def check(
             )
         if show_diff:
             render_diff(report, console=out_console)
+        if show_raw_hits:
+            render_raw_hits(report, console=out_console)
 
+    exit_code = 0
     if fail_below is not None and report.visibility_score * 100 < fail_below:
-        raise typer.Exit(code=1)
+        exit_code = 1
+    if fail_below_raw is not None and report.raw_presence_score * 100 < fail_below_raw:
+        exit_code = 1
+    if exit_code:
+        raise typer.Exit(code=exit_code)
 
 
 def main() -> None:

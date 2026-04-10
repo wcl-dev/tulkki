@@ -390,3 +390,43 @@ def render_diff(report: VisibilityReport, console: Console | None = None) -> Non
         "humans (usually extraction noise).[/dim]"
     )
     console.print()
+
+
+def render_raw_hits(
+    report: VisibilityReport, console: Console | None = None
+) -> None:
+    """Print rendered sentences that are absent from the raw HTML bytes.
+
+    These are the "rendering gap" contents — text that genuinely only
+    exists after JavaScript execution. Up to 20 samples are shown.
+    """
+    console = console or Console()
+    missing = report.raw_presence.missing_sentences
+
+    console.print()
+    console.rule(
+        "[bold]Rendering-gap sentences[/bold]  "
+        "[dim](absent from raw HTML bytes)[/dim]"
+    )
+    console.print()
+
+    if not missing:
+        console.print(
+            "[dim]All rendered sentences were found in the raw HTML bytes.[/dim]"
+        )
+        console.print()
+        return
+
+    for i, s in enumerate(missing, 1):
+        # Truncate long sentences for readability
+        display = s[:120] + "..." if len(s) > 120 else s
+        console.print(f"  [red]{i}.[/red] {display}", highlight=False)
+
+    total_missing = report.raw_presence.sentences_checked - report.raw_presence.sentences_found_in_raw
+    if total_missing > len(missing):
+        console.print(
+            f"\n  [dim]... and {total_missing - len(missing)} more "
+            f"(showing first {len(missing)} of {total_missing})[/dim]"
+        )
+
+    console.print()
