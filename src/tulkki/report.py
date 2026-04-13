@@ -17,6 +17,7 @@ from rich.table import Table
 from rich.text import Text
 
 from .descriptions import METRIC_HELP_PLAIN
+from .diff import SCORE_OK_THRESHOLD
 from .types import GapKind, VisibilityReport
 
 
@@ -64,7 +65,7 @@ def _format_bytes(n: int) -> str:
 
 
 _SCORE_BANDS: list[tuple[float, str, str]] = [
-    (0.85, "green", "#22c55e"),
+    (SCORE_OK_THRESHOLD, "green", "#22c55e"),
     (0.50, "yellow", "#eab308"),
     (0.00, "red", "#ef4444"),
 ]
@@ -236,7 +237,7 @@ def render_terminal(
         # Raw HTML coverage line
         rp_pct = report.raw_presence_score * 100
         rp_color = _score_color(report.raw_presence_score)
-        rp_icon = "[ok]" if report.raw_presence_score >= 0.85 else "[!]"
+        rp_icon = "[ok]" if report.raw_presence_score >= SCORE_OK_THRESHOLD else "[!]"
         rp_line = Text()
         rp_line.append("Raw HTML coverage:     ", style="bold")
         rp_line.append(f"{rp_pct:.1f}%  {rp_icon}", style=f"bold {rp_color}")
@@ -248,7 +249,7 @@ def render_terminal(
     # Extractor visibility line (= visibility_score, always shown)
     vis_pct = report.visibility_score * 100
     vis_color = _score_color(report.visibility_score)
-    vis_icon = "[ok]" if report.visibility_score >= 0.85 else "[!]"
+    vis_icon = "[ok]" if report.visibility_score >= SCORE_OK_THRESHOLD else "[!]"
     vis_line = Text()
     vis_line.append("Extractor visibility:  ", style="bold")
     vis_line.append(f"{vis_pct:.1f}%  {vis_icon}", style=f"bold {vis_color}")

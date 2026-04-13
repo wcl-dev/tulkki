@@ -78,7 +78,14 @@ def _missing_headings(
     return tuple(missing)
 
 
-MATERIAL_THRESHOLD = 0.15  # a gap >= 15% is considered material
+# Score at or above this is "green" / "ok" — no actionable visibility gap.
+# 0.85 is an eyeballed starting point; will be tuned in v0.3 once we have
+# batch-scan data on how normal websites distribute.
+SCORE_OK_THRESHOLD = 0.85
+
+# A gap this large (1 - SCORE_OK_THRESHOLD) is considered material in
+# gap-kind classification.
+MATERIAL_THRESHOLD = 1 - SCORE_OK_THRESHOLD
 
 
 def _classify_gap(
