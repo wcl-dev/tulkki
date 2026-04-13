@@ -126,6 +126,34 @@
   }
 
   /* Example output */
+  .ai-views {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+  .ai-view {
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+  }
+  .ai-view .ai-who {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.15rem;
+  }
+  .ai-view .ai-sub {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+    font-family: var(--mono);
+  }
+  .ai-view .ai-sees {
+    font-size: 0.95rem;
+    color: #2f363d;
+    line-height: 1.5;
+  }
   .example-scores {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -151,6 +179,39 @@
     margin-top: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+  }
+  .score-card .score-note {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    font-style: italic;
+    line-height: 1.4;
+  }
+  .metric-defs {
+    margin: 1.5rem 0;
+  }
+  .metric-def {
+    padding: 1rem 0;
+    border-top: 1px solid var(--border);
+  }
+  .metric-def:first-child { border-top: none; padding-top: 0; }
+  .metric-def:last-child { padding-bottom: 0; }
+  .metric-def-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.4rem;
+  }
+  .metric-def-title code {
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: none;
+    padding: 0;
+    margin-left: 0.5rem;
+  }
+  .metric-def-body {
+    font-size: 0.9rem;
+    color: #2f363d;
+    line-height: 1.6;
   }
   .score-card.low .number { color: var(--red); }
   .score-card.ok .number { color: var(--green); }
@@ -292,11 +353,40 @@
 
 <section id="example">
   <div class="container">
-    <h2>Example: Anthropic Economic Index</h2>
+    <h2>A real example</h2>
     <p>
-      The flagship test case. Anthropic's own landing page about how AI
-      affects the economy — built on Next.js 13 React Server Components.
-      Same URL, very different answers depending on which AI pipeline reads it.
+      Anthropic has a page about how AI affects the economy. Open it in
+      Chrome and you see a world map, rankings for 50 states, task categories
+      with percentages, and methodology notes — about
+      <strong>689 words of content</strong>.
+    </p>
+
+    <p style="margin-top: 1.5rem">
+      Here's what different AI systems see when they visit the exact same URL:
+    </p>
+
+    <div class="ai-views">
+      <div class="ai-view">
+        <div class="ai-who">Most AI training crawlers</div>
+        <div class="ai-sub">GPTBot, ClaudeBot, Common Crawl WET</div>
+        <div class="ai-sees"><strong>53 words.</strong> Mostly the navigation menu and the word &ldquo;Loading&rdquo;.</div>
+      </div>
+      <div class="ai-view">
+        <div class="ai-who">AI pipelines reading raw HTML bytes</div>
+        <div class="ai-sub">Training pipelines that tokenize script tag contents</div>
+        <div class="ai-sees">More content is technically present, but buried inside framework code — hard to use as training signal.</div>
+      </div>
+      <div class="ai-view">
+        <div class="ai-who">AI systems that run JavaScript first</div>
+        <div class="ai-sub">Google&rsquo;s AI Overviews, some real-time agents</div>
+        <div class="ai-sees"><strong>All 689 words.</strong> Same as a human user.</div>
+      </div>
+    </div>
+
+    <p style="margin-top: 1.5rem">
+      <strong>Same URL. Three AI systems. Three completely different answers.</strong>
+      A page about AI, invisible to most AI &mdash; and the page owner has no
+      way to know until a tool tells them.
     </p>
 
     <div class="example-scores">
@@ -310,16 +400,44 @@
       </div>
     </div>
 
+    <div class="metric-defs">
+      <div class="metric-def">
+        <div class="metric-def-title">
+          Raw HTML coverage <code>raw_presence_score</code>
+        </div>
+        <div class="metric-def-body">
+          The fraction of human-visible content that can be found as literal
+          text inside the raw HTML bytes &mdash; before any extraction or
+          JavaScript runs. This is the <strong>upper bound</strong> of what
+          any AI crawler could possibly see, including training pipelines
+          that tokenize raw HTML directly (script tag contents included).
+        </div>
+      </div>
+      <div class="metric-def">
+        <div class="metric-def-title">
+          Extractor visibility <code>visibility_score</code>
+        </div>
+        <div class="metric-def-body">
+          The fraction of human-visible content that a standard
+          boilerplate-stripping extractor (trafilatura) recovers from the
+          raw HTML. This represents what
+          <strong>Common Crawl&rsquo;s WET files, readability.js, and most
+          AI training pipelines</strong> actually see in practice. When this
+          is low, your content is invisible to the majority of training
+          crawlers even if it&rsquo;s technically present in the bytes.
+        </div>
+      </div>
+    </div>
+
     <p>
-      <span class="gap-pill">MIXED</span>
-      Data tables are embedded in Next.js RSC flight data (in the raw HTML
-      but invisible to standard extractors). Explanatory text and methodology
-      notes only exist after JavaScript executes.
+      tulkki runs on any URL in about 15 seconds and produces a shareable
+      HTML report like the ones below. You can hand it to a client, attach
+      it to a pull request, or diff it against last week&rsquo;s version.
     </p>
 
     <div class="report-links">
-      <a href="examples/anthropic-economic-index.html">View full HTML report</a>
-      <a href="examples/mistral-small-4.html">Compare: Mistral product page (100% visible)</a>
+      <a href="examples/anthropic-economic-index.html">See the Anthropic report</a>
+      <a href="examples/mistral-small-4.html">Compare with Mistral (every AI sees 100%)</a>
     </div>
   </div>
 </section>
