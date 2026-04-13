@@ -1,6 +1,8 @@
 # tulkki
 
-**AI crawler visibility diagnostic for web pages.** A local CLI that fetches a URL three ways — as raw HTML bytes, as the content a standard extractor recovers, and as a rendered browser DOM — and tells you which AI crawlers will see your content, which won't, and why.
+*See your site through an AI crawler's eyes.*
+
+A local CLI that fetches a URL three ways — as raw HTML bytes, as the content a standard extractor recovers, and as a rendered browser DOM — and tells you which AI crawlers will see your content, which won't, and why.
 
 ```
 $ tulkki check https://www.anthropic.com/economic-index
@@ -50,12 +52,7 @@ tulkki fills the gap: a small, auditable, reproducible CLI that runs locally (no
 
 ## Install
 
-```sh
-pipx install tulkki
-playwright install chromium
-```
-
-Or from source:
+tulkki is not yet on PyPI. Install from source with [uv](https://docs.astral.sh/uv/):
 
 ```sh
 git clone https://github.com/tulkki-dev/tulkki
@@ -65,7 +62,7 @@ uv run playwright install chromium
 uv run tulkki check https://example.com
 ```
 
-Playwright's Chromium is ~108 MB and only needs installing once per machine.
+Playwright's Chromium is ~108 MB and only needs installing once per machine. A PyPI release is planned once the API stabilises.
 
 ## Usage
 
