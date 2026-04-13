@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tulkki report — https://mistral.ai/news/mistral-small-4</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155;
+           --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e;
+           --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif;
+          background: var(--bg); color: var(--text); padding: 2rem;
+          max-width: 960px; margin: 0 auto; line-height: 1.6; }
+  h1 { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--cyan); }
+  h3 { font-size: 0.9rem; margin: 1rem 0 0.5rem; }
+  .url { font-size: 0.85rem; color: var(--cyan); word-break: break-all; }
+  .card { background: var(--card); border: 1px solid var(--border);
+           border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .scores { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .score-box { text-align: center; padding: 1rem; border-radius: 6px;
+                background: var(--bg); }
+  .score-box .number { font-size: 2rem; font-weight: 700; }
+  .score-box .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .help { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem;
+           border-left: 2px solid var(--border); padding-left: 0.75rem; }
+  .tag { display: inline-block; background: var(--border); color: var(--text);
+          padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
+          margin: 0.5rem 0; }
+  .gap-kind { font-size: 1.1rem; font-weight: 600; }
+  .interp { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+  .warning { background: #451a1a; border: 1px solid var(--red);
+              border-radius: 6px; padding: 0.75rem; margin: 1rem 0;
+              font-size: 0.85rem; color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left;
+            border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .missing { list-style: none; padding: 0; }
+  .missing li::before { content: "\2717 "; color: var(--red); }
+  .missing li { margin: 0.25rem 0; font-size: 0.85rem; }
+  .diff { background: var(--bg); border-radius: 6px; padding: 1rem;
+           font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
+           overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--cyan); margin-top: 0.5rem; }
+  .diff-meta { color: var(--muted); font-weight: 600; }
+  .diff-ctx { color: var(--muted); }
+  .meta { font-size: 0.8rem; color: var(--muted); }
+  footer { margin-top: 2rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>tulkki visibility report</h1>
+<div class="url">https://mistral.ai/news/mistral-small-4</div>
+
+
+
+<div class="card">
+  <div class="meta">
+    Fetched at 2026-04-10T08:29:45+00:00 &middot;
+    Raw 253.0 KB (httpx, HTTP 200) &middot;
+    Rendered 267.5 KB (playwright, HTTP 200)
+  </div>
+  <div class="tag">Framework: nextjs-rsc</div>
+</div>
+
+<div class="scores">
+  <div class="score-box card">
+    <div class="number" style="color: #eab308">60.6%</div>
+    <div class="label">Raw HTML coverage</div>
+    <div class="help">Raw HTML coverage measures what fraction of the human-visible content can be found as literal text inside the raw HTML bytes (before any JavaScript runs). This represents the upper bound of what any AI crawler could possibly see — including training pipelines that tokenize raw HTML directly.</div>
+  </div>
+  <div class="score-box card">
+    <div class="number" style="color: #22c55e">100.0%</div>
+    <div class="label">Extractor visibility</div>
+    <div class="help">Extractor visibility measures what fraction of the human-visible content is recovered by a standard boilerplate-stripping extractor (trafilatura). This represents what tools like Common Crawl&#x27;s WET files, readability.js, and most content-extraction pipelines would actually see.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="gap-kind" style="color: #22c55e">NONE</div>
+  <div class="interp">AI crawlers see the same content as human users.</div>
+  <div class="help" style="margin-top: 0.75rem">Gap kind classifies why content is missing. &#x27;NONE&#x27; = AI sees everything. &#x27;EXTRACTION&#x27; = content is in the HTML bytes but extractors can&#x27;t unpack it (e.g. locked inside framework data structures). &#x27;RENDERING&#x27; = content only exists after JavaScript execution. &#x27;MIXED&#x27; = both problems are present. &#x27;BLOCKED&#x27; = HTTP error, scores are meaningless.</div>
+</div>
+
+<h2>Views comparison</h2>
+<div class="card">
+  <table>
+    <tr><th>View</th><th>Title</th><th class="num">Words</th><th class="num">Headings</th></tr>
+    <tr>
+      <td>Extracted (AI)</td>
+      <td>Introducing Mistral Small 4 | Mistral AI</td>
+      <td class="num">928</td>
+      <td class="num">13</td>
+    </tr>
+    <tr>
+      <td>Rendered (Human)</td>
+      <td>Introducing Mistral Small 4 | Mistral AI</td>
+      <td class="num">928</td>
+      <td class="num">13</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Raw-bytes presence</h2>
+<div class="card">
+  <table>
+    <tr><th></th><th class="num">Found</th><th class="num">Total</th><th class="num">Coverage</th></tr>
+    <tr>
+      <td>Sentences</td>
+      <td class="num">20</td>
+      <td class="num">33</td>
+      <td class="num">60.6%</td>
+    </tr>
+    <tr>
+      <td>Headings</td>
+      <td class="num">13</td>
+      <td class="num">13</td>
+      <td class="num">100.0%</td>
+    </tr>
+  </table>
+</div>
+
+
+
+<h2>Content diff</h2>
+<div class="card">
+  <div class="diff"><p class="muted">No difference between AI and human views.</p></div>
+  <div class="help" style="margin-top: 0.75rem">
+    <span style="color: var(--green)">Green</span> = visible to humans but not AI.
+    <span style="color: var(--red)">Red</span> = visible to AI but not humans.
+  </div>
+</div>
+
+<footer>
+  Generated by <strong>tulkki 2026-04-10 08:29 UTC</strong>
+  &middot; <a href="https://github.com/anthropics/tulkki" style="color: var(--cyan)">github.com/anthropics/tulkki</a>
+</footer>
+
+</body>
+</html>

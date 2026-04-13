@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tulkki — see your site through an AI crawler's eyes</title>
+<meta name="description" content="A local CLI that diagnoses what AI crawlers see on your website — three views, two scores, one clear answer.">
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #f8f9fa;
+    --surface-2: #f1f3f5;
+    --border: #e1e4e8;
+    --text: #1a1a1a;
+    --muted: #586069;
+    --accent: #0366d6;
+    --accent-hover: #0246a3;
+    --green: #22863a;
+    --red: #cb2431;
+    --yellow: #b08800;
+    --mono: 'SF Mono', 'Cascadia Code', Consolas, Monaco, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .container { max-width: 860px; margin: 0 auto; padding: 0 1.5rem; }
+
+  /* Hero */
+  header {
+    padding: 5rem 0 4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand {
+    font-family: var(--mono);
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  .tagline {
+    font-size: 1.35rem;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 1.5rem;
+  }
+  .pitch {
+    font-size: 1.1rem;
+    max-width: 680px;
+    color: #2f363d;
+  }
+  .badges {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    text-decoration: none;
+    background: var(--surface);
+  }
+  .badge:hover { background: var(--surface-2); }
+
+  /* Sections */
+  section { padding: 3.5rem 0; border-bottom: 1px solid var(--border); }
+  section:last-of-type { border-bottom: none; }
+  h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    font-size: 1.05rem;
+    margin: 1.5rem 0 0.5rem;
+    color: var(--accent);
+  }
+  p { margin-bottom: 1rem; color: #2f363d; }
+  p:last-child { margin-bottom: 0; }
+
+  /* Three-threshold callout */
+  .thresholds {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 1.5rem 0;
+  }
+  @media (min-width: 640px) {
+    .thresholds { grid-template-columns: repeat(3, 1fr); }
+  }
+  .threshold {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+  }
+  .threshold .num {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+  .threshold .title {
+    font-weight: 600;
+    margin-bottom: 0.4rem;
+    font-size: 0.95rem;
+  }
+  .threshold .desc {
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Example output */
+  .example-scores {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .score-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .score-card .number {
+    font-family: var(--mono);
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .score-card .label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .score-card.low .number { color: var(--red); }
+  .score-card.ok .number { color: var(--green); }
+  .score-card.warn .number { color: var(--yellow); }
+  .gap-pill {
+    display: inline-block;
+    background: #fff8e1;
+    border: 1px solid var(--yellow);
+    color: var(--yellow);
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-right: 0.5rem;
+  }
+  .report-links {
+    margin-top: 1rem;
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+  .report-links a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+  }
+  .report-links a:hover {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* Code */
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    margin: 1rem 0;
+  }
+  code {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--surface-2);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .comment { color: var(--muted); }
+
+  /* Footer */
+  footer {
+    padding: 2.5rem 0 3rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  footer a { color: var(--muted); }
+  footer a:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="brand">tulkki</div>
+    <div class="tagline">See your site through an AI crawler's eyes.</div>
+    <p class="pitch">
+      A local command-line tool that diagnoses what AI crawlers actually see
+      on your website. Fetches a URL three ways — raw HTML bytes, extracted
+      content, and post-JavaScript DOM — and tells you which AI systems will
+      see your content, which won't, and why.
+    </p>
+    <div class="badges">
+      <a class="badge" href="https://github.com/wcl-dev/tulkki">GitHub</a>
+      <a class="badge" href="https://github.com/wcl-dev/tulkki/releases/latest">v0.2.0</a>
+      <a class="badge" href="https://github.com/wcl-dev/tulkki/blob/master/CHANGELOG.md">Changelog</a>
+      <span class="badge">MIT license</span>
+      <span class="badge">Python 3.12+</span>
+    </div>
+  </div>
+</header>
+
+<section id="why">
+  <div class="container">
+    <h2>Why tulkki</h2>
+    <p>
+      AI visibility is <strong>not one thing</strong> — it's three different
+      thresholds. A page can be 100% visible to one AI crawler, 5% to another,
+      and invisible to a third, all on the same URL. Most tools give you one
+      number. tulkki measures all three.
+    </p>
+
+    <div class="thresholds">
+      <div class="threshold">
+        <div class="num">#1</div>
+        <div class="title">Raw HTML bytes</div>
+        <div class="desc">
+          What any pipeline tokenizing raw HTML directly would see — including
+          training crawlers that read script tags.
+        </div>
+      </div>
+      <div class="threshold">
+        <div class="num">#2</div>
+        <div class="title">Standard extraction</div>
+        <div class="desc">
+          What Common Crawl WET files, readability.js, and most content
+          pipelines actually see after boilerplate stripping.
+        </div>
+      </div>
+      <div class="threshold">
+        <div class="num">#3</div>
+        <div class="title">Post-JS DOM</div>
+        <div class="desc">
+          What human browsers see, and what AI systems that execute
+          JavaScript (like Google-Extended) can reach.
+        </div>
+      </div>
+    </div>
+
+    <p>
+      Different AI systems use different pipelines and hit different
+      thresholds. Without measuring all three, you can't tell whether a
+      visibility problem is your framework, your rendering strategy, or
+      something else entirely.
+    </p>
+  </div>
+</section>
+
+<section id="example">
+  <div class="container">
+    <h2>Example: Anthropic Economic Index</h2>
+    <p>
+      The flagship test case. Anthropic's own landing page about how AI
+      affects the economy — built on Next.js 13 React Server Components.
+      Same URL, very different answers depending on which AI pipeline reads it.
+    </p>
+
+    <div class="example-scores">
+      <div class="score-card warn">
+        <div class="number">40.0%</div>
+        <div class="label">Raw HTML coverage</div>
+      </div>
+      <div class="score-card low">
+        <div class="number">5.4%</div>
+        <div class="label">Extractor visibility</div>
+      </div>
+    </div>
+
+    <p>
+      <span class="gap-pill">MIXED</span>
+      Data tables are embedded in Next.js RSC flight data (in the raw HTML
+      but invisible to standard extractors). Explanatory text and methodology
+      notes only exist after JavaScript executes.
+    </p>
+
+    <div class="report-links">
+      <a href="examples/anthropic-economic-index.html">View full HTML report</a>
+      <a href="examples/mistral-small-4.html">Compare: Mistral product page (100% visible)</a>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="container">
+    <h2>Install and try</h2>
+    <p>
+      tulkki runs locally with no API keys. Install from source with
+      <a href="https://docs.astral.sh/uv/">uv</a>:
+    </p>
+<pre><code>git clone https://github.com/wcl-dev/tulkki
+cd tulkki
+uv sync
+uv run playwright install chromium
+uv run tulkki check https://example.com</code></pre>
+
+    <h3>Run a diagnostic</h3>
+<pre><code><span class="comment"># Terminal report + AI-view and human-view markdown files</span>
+tulkki check https://example.com
+
+<span class="comment"># Add a self-contained HTML report you can share</span>
+tulkki check https://example.com --html
+
+<span class="comment"># Plain-English explanation of every metric</span>
+tulkki explain</code></pre>
+
+    <h3>Automate in CI</h3>
+<pre><code><span class="comment"># Exit 1 if extractor visibility drops below 80%</span>
+tulkki check https://example.com --quiet --fail-below 80
+
+<span class="comment"># Also fail if raw HTML coverage drops below 60%</span>
+tulkki check https://example.com --quiet \
+  --fail-below 80 --fail-below-raw 60</code></pre>
+  </div>
+</section>
+
+<section id="for">
+  <div class="container">
+    <h2>Who this is for</h2>
+    <p>
+      tulkki is built for the niche of practitioners currently underserved
+      by SEO tools and marketing score-checkers:
+    </p>
+
+    <ul style="margin-left: 1.5rem; color: #2f363d;">
+      <li><strong>GEO (Generative Engine Optimization) consultants</strong> — quantitative reports you can show clients</li>
+      <li><strong>Technical documentation maintainers</strong> — verify your docs are reachable by LLM assistants</li>
+      <li><strong>RAG / AI product engineers</strong> — debug why your crawler sees less than the client expects</li>
+      <li><strong>Researchers and journalists</strong> — a reproducible methodology for measuring "AI visible web"</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    tulkki &middot;
+    <a href="https://github.com/wcl-dev/tulkki">GitHub</a> &middot;
+    <a href="https://github.com/wcl-dev/tulkki/blob/master/CHANGELOG.md">Changelog</a> &middot;
+    MIT licensed
+  </div>
+</footer>
+
+</body>
+</html>

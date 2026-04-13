@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tulkki report — https://www.anthropic.com/economic-index</title>
+<style>
+  :root { --bg: #0f172a; --card: #1e293b; --border: #334155;
+           --text: #e2e8f0; --muted: #94a3b8; --green: #22c55e;
+           --red: #ef4444; --yellow: #eab308; --cyan: #06b6d4; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif;
+          background: var(--bg); color: var(--text); padding: 2rem;
+          max-width: 960px; margin: 0 auto; line-height: 1.6; }
+  h1 { font-size: 1.1rem; color: var(--muted); margin-bottom: 0.5rem; }
+  h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; color: var(--cyan); }
+  h3 { font-size: 0.9rem; margin: 1rem 0 0.5rem; }
+  .url { font-size: 0.85rem; color: var(--cyan); word-break: break-all; }
+  .card { background: var(--card); border: 1px solid var(--border);
+           border-radius: 8px; padding: 1.25rem; margin: 1rem 0; }
+  .scores { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .score-box { text-align: center; padding: 1rem; border-radius: 6px;
+                background: var(--bg); }
+  .score-box .number { font-size: 2rem; font-weight: 700; }
+  .score-box .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
+  .help { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem;
+           border-left: 2px solid var(--border); padding-left: 0.75rem; }
+  .tag { display: inline-block; background: var(--border); color: var(--text);
+          padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.8rem;
+          margin: 0.5rem 0; }
+  .gap-kind { font-size: 1.1rem; font-weight: 600; }
+  .interp { color: var(--muted); font-size: 0.85rem; margin-top: 0.5rem; }
+  .warning { background: #451a1a; border: 1px solid var(--red);
+              border-radius: 6px; padding: 0.75rem; margin: 1rem 0;
+              font-size: 0.85rem; color: var(--red); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  th, td { padding: 0.5rem 0.75rem; text-align: left;
+            border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .missing { list-style: none; padding: 0; }
+  .missing li::before { content: "\2717 "; color: var(--red); }
+  .missing li { margin: 0.25rem 0; font-size: 0.85rem; }
+  .diff { background: var(--bg); border-radius: 6px; padding: 1rem;
+           font-family: 'SF Mono', Consolas, monospace; font-size: 0.75rem;
+           overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--cyan); margin-top: 0.5rem; }
+  .diff-meta { color: var(--muted); font-weight: 600; }
+  .diff-ctx { color: var(--muted); }
+  .meta { font-size: 0.8rem; color: var(--muted); }
+  footer { margin-top: 2rem; padding-top: 1rem;
+            border-top: 1px solid var(--border);
+            font-size: 0.75rem; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>tulkki visibility report</h1>
+<div class="url">https://www.anthropic.com/economic-index</div>
+
+
+
+<div class="card">
+  <div class="meta">
+    Fetched at 2026-04-10T08:33:56+00:00 &middot;
+    Raw 2.65 MB (httpx, HTTP 200) &middot;
+    Rendered 14.08 MB (playwright, HTTP 200)
+  </div>
+  <div class="tag">Framework: nextjs-rsc</div>
+</div>
+
+<div class="scores">
+  <div class="score-box card">
+    <div class="number" style="color: #ef4444">40.0%</div>
+    <div class="label">Raw HTML coverage</div>
+    <div class="help">Raw HTML coverage measures what fraction of the human-visible content can be found as literal text inside the raw HTML bytes (before any JavaScript runs). This represents the upper bound of what any AI crawler could possibly see — including training pipelines that tokenize raw HTML directly.</div>
+  </div>
+  <div class="score-box card">
+    <div class="number" style="color: #ef4444">5.4%</div>
+    <div class="label">Extractor visibility</div>
+    <div class="help">Extractor visibility measures what fraction of the human-visible content is recovered by a standard boilerplate-stripping extractor (trafilatura). This represents what tools like Common Crawl&#x27;s WET files, readability.js, and most content-extraction pipelines would actually see.</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="gap-kind" style="color: #eab308">MIXED</div>
+  <div class="interp">Both extraction and rendering gaps are present. Some content is locked inside framework data structures in the raw HTML, and some content only appears after JavaScript execution.</div>
+  <div class="help" style="margin-top: 0.75rem">Gap kind classifies why content is missing. &#x27;NONE&#x27; = AI sees everything. &#x27;EXTRACTION&#x27; = content is in the HTML bytes but extractors can&#x27;t unpack it (e.g. locked inside framework data structures). &#x27;RENDERING&#x27; = content only exists after JavaScript execution. &#x27;MIXED&#x27; = both problems are present. &#x27;BLOCKED&#x27; = HTTP error, scores are meaningless.</div>
+</div>
+
+<h2>Views comparison</h2>
+<div class="card">
+  <table>
+    <tr><th>View</th><th>Title</th><th class="num">Words</th><th class="num">Headings</th></tr>
+    <tr>
+      <td>Extracted (AI)</td>
+      <td>Anthropic Economic Index Understanding AI’s effects on the economy</td>
+      <td class="num">53</td>
+      <td class="num">0</td>
+    </tr>
+    <tr>
+      <td>Rendered (Human)</td>
+      <td>Anthropic Economic Index Understanding AI’s effects on the economy</td>
+      <td class="num">689</td>
+      <td class="num">4</td>
+    </tr>
+  </table>
+</div>
+
+<h2>Raw-bytes presence</h2>
+<div class="card">
+  <table>
+    <tr><th></th><th class="num">Found</th><th class="num">Total</th><th class="num">Coverage</th></tr>
+    <tr>
+      <td>Sentences</td>
+      <td class="num">8</td>
+      <td class="num">20</td>
+      <td class="num">40.0%</td>
+    </tr>
+    <tr>
+      <td>Headings</td>
+      <td class="num">1</td>
+      <td class="num">4</td>
+      <td class="num">25.0%</td>
+    </tr>
+  </table>
+</div>
+
+<h3>Sections AI cannot see</h3><ul class="missing"><li>Anthropic Economic Index Understanding AI’s effects on the economy <span class='muted'>(h1)</span></li><li>Anthropic Economic Index <span class='muted'>(h1)</span></li><li>Countries in view <span class='muted'>(h3)</span></li><li>Explore by job <span class='muted'>(h3)</span></li></ul>
+
+<h2>Content diff</h2>
+<div class="card">
+  <div class="diff"><div class="diff-meta">--- ai_view.md</div>
+<div class="diff-meta">+++ human_view.md</div>
+<div class="diff-hunk">@@ -1,17 +1,202 @@</div>
+<div class="diff-del">-Skip to main content</div>
+<div class="diff-del">-Skip to footer</div>
+<div class="diff-del">-Research</div>
+<div class="diff-del">-Economic Futures</div>
+<div class="diff-del">-Commitments</div>
+<div class="diff-del">-Learn</div>
+<div class="diff-del">-News</div>
+<div class="diff-del">-Try Claude</div>
+<div class="diff-del">-Anthropic Economic Index</div>
+<div class="diff-del">-Understanding AI’s effects on the economy</div>
+<div class="diff-add">+# Anthropic Economic Index Understanding AI’s effects on the economy</div>
+<div class="diff-add">+</div>
+<div class="diff-ctx"> Last updated: Mar 24, 2026</div>
+<div class="diff-del">-Loading data</div>
+<div class="diff-del">-The Anthropic Economic Index \ Anthropic</div>
+<div class="diff-del">-Anthropic Economic Index</div>
+<div class="diff-del">-Understanding AI’s effects on the economy</div>
+<div class="diff-del">-Last updated: Mar 24, 2026</div>
+<div class="diff-del">-Loading data</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+# Anthropic Economic Index</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+Last updated Mar 24, 2026</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+- Washington, D.C.1</div>
+<div class="diff-add">+- Massachusetts2</div>
+<div class="diff-add">+- Washington3</div>
+<div class="diff-add">+- New York4</div>
+<div class="diff-add">+- California5</div>
+<div class="diff-add">+- Colorado6</div>
+<div class="diff-add">+- Virginia7</div>
+<div class="diff-add">+- Utah8</div>
+<div class="diff-add">+- Wyoming9</div>
+<div class="diff-add">+- Maryland10</div>
+<div class="diff-add">+- Hawaii11</div>
+<div class="diff-add">+- Oregon12</div>
+<div class="diff-add">+- Connecticut13</div>
+<div class="diff-add">+- Vermont14</div>
+<div class="diff-add">+- Rhode Island15</div>
+<div class="diff-add">+- New Hampshire16</div>
+<div class="diff-add">+- Illinois17</div>
+<div class="diff-add">+- Georgia18</div>
+<div class="diff-add">+- New Jersey19</div>
+<div class="diff-add">+- North Carolina20</div>
+<div class="diff-add">+- Pennsylvania21</div>
+<div class="diff-add">+- Florida22</div>
+<div class="diff-add">+- Texas23</div>
+<div class="diff-add">+- Arizona24</div>
+<div class="diff-add">+- Nevada25</div>
+<div class="diff-add">+- Delaware26</div>
+<div class="diff-add">+- Minnesota27</div>
+<div class="diff-add">+- Tennessee28</div>
+<div class="diff-add">+- Michigan29</div>
+<div class="diff-add">+- Idaho30</div>
+<div class="diff-add">+- Nebraska31</div>
+<div class="diff-add">+- Ohio32</div>
+<div class="diff-add">+- Indiana33</div>
+<div class="diff-add">+- Maine34</div>
+<div class="diff-add">+- Kansas35</div>
+<div class="diff-add">+- Wisconsin36</div>
+<div class="diff-add">+- Missouri37</div>
+<div class="diff-add">+- Montana38</div>
+<div class="diff-add">+- Alaska39</div>
+<div class="diff-add">+- Oklahoma40</div>
+<div class="diff-add">+- Alabama41</div>
+<div class="diff-add">+- South Carolina42</div>
+<div class="diff-add">+- Iowa43</div>
+<div class="diff-add">+- Louisiana44</div>
+<div class="diff-add">+- New Mexico45</div>
+<div class="diff-add">+- Kentucky46</div>
+<div class="diff-add">+- Arkansas47</div>
+<div class="diff-add">+- South Dakota48</div>
+<div class="diff-add">+- North Dakota49</div>
+<div class="diff-add">+- West Virginia50</div>
+<div class="diff-add">+- Mississippi51</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+The most common topics in Washington, D.C..</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+- 1. Assist with academic assignments and coursework across multiple disciplines6.2%</div>
+<div class="diff-add">+- 2. Draft and refine professional workplace emails and business correspondence5.9%</div>
+<div class="diff-add">+- 3. Create, convert, format, and manipulate documents across multiple file types5.5%</div>
+<div class="diff-add">+- 4. Troubleshoot and configure hardware, software, and system technical issues3.2%</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+Percentages represent the share of Claude.ai conversations associated with each task or group of tasks. Graphic shows what people do with Claude, not their job titles. Percentages don&#x27;t sum to 100% because we impose privacy filters.</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+The world map shows data on Claude.ai conversations. The world map is based on Natural Earth&#x27;s world map with the ISO standard point of view for disputed territories, which means that the map may not contain some disputed territories. We note that in addition to the countries shown in gray (&#x27;Claude not available&#x27;), we do not operate in the Ukrainian regions Crimea, Donetsk, Kherson, Luhansk, and Zaporizhzhia. In accordance with international sanctions and our commitment to supporting Ukraine&#x27;s territorial integrity, our services are not available in areas under Russian occupation.</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+### Countries in view</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+The most common topics in Australia.</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+- 1. Draft and refine professional workplace emails and business correspondence4.4%</div>
+<div class="diff-add">+- 2. Assist with academic assignments and coursework across multiple disciplines4.1%</div>
+<div class="diff-add">+- 3. Troubleshoot and configure hardware, software, and system technical issues3.8%</div>
+<div class="diff-add">+- 4. Develop and manage business software applications across multiple industries3.3%</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+- Singapore1</div>
+<div class="diff-add">+- Israel2</div>
+<div class="diff-add">+- Luxembourg3</div>
+<div class="diff-add">+- Switzerland4</div>
+<div class="diff-add">+- United States5</div>
+<div class="diff-add">+- Canada6</div>
+<div class="diff-add">+- Australia7</div>
+<div class="diff-add">+- The Netherlands8</div>
+<div class="diff-add">+- Malta9</div>
+<div class="diff-add">+- Estonia10</div>
+<div class="diff-add">+- United Kingdom11</div>
+<div class="diff-add">+- South Korea12</div>
+<div class="diff-add">+- New Zealand13</div>
+<div class="diff-add">+- France14</div>
+<div class="diff-add">+- Sweden15</div>
+<div class="diff-add">+- Ireland16</div>
+<div class="diff-add">+- Cyprus17</div>
+<div class="diff-add">+- Norway18</div>
+<div class="diff-add">+- Denmark19</div>
+<div class="diff-add">+- Portugal20</div>
+<div class="diff-add">+- Belgium21</div>
+<div class="diff-add">+- Lithuania22</div>
+<div class="diff-add">+- Latvia23</div>
+<div class="diff-add">+- Finland24</div>
+<div class="diff-add">+- Austria25</div>
+<div class="diff-add">+- Germany26</div>
+<div class="diff-add">+- Georgia27</div>
+<div class="diff-add">+- Slovenia28</div>
+<div class="diff-add">+- United Arab Emirates29</div>
+<div class="diff-add">+- Spain30</div>
+<div class="diff-add">+- Italy31</div>
+<div class="diff-add">+- Croatia32</div>
+<div class="diff-add">+- Czechia33</div>
+<div class="diff-add">+- Moldova34</div>
+<div class="diff-add">+- Japan35</div>
+<div class="diff-add">+- Serbia36</div>
+<div class="diff-add">+- Poland37</div>
+<div class="diff-add">+- Bulgaria38</div>
+<div class="diff-add">+- Taiwan39</div>
+<div class="diff-add">+- Mauritius40</div>
+<div class="diff-add">+- North Macedonia41</div>
+<div class="diff-add">+- Greece42</div>
+<div class="diff-add">+- Romania43</div>
+<div class="diff-add">+- Slovakia44</div>
+<div class="diff-add">+- Armenia45</div>
+<div class="diff-add">+- Puerto Rico46</div>
+<div class="diff-add">+- Uruguay47</div>
+<div class="diff-add">+- Hungary48</div>
+<div class="diff-add">+- Qatar49</div>
+<div class="diff-add">+- Tunisia50</div>
+<div class="diff-add">+- Costa Rica51</div>
+<div class="diff-add">+- Ukraine52</div>
+<div class="diff-add">+- Albania53</div>
+<div class="diff-add">+- Bahrain54</div>
+<div class="diff-add">+- Chile55</div>
+<div class="diff-add">+- Lebanon56</div>
+<div class="diff-add">+- Bosnia and Herzegovina57</div>
+<div class="diff-add">+- Panama58</div>
+<div class="diff-add">+- Colombia59</div>
+<div class="diff-add">+- Jamaica60</div>
+<div class="diff-add">+- Brazil61</div>
+<div class="diff-add">+- Morocco62</div>
+<div class="diff-add">+- Sri Lanka63</div>
+<div class="diff-add">+- Dominican Republic64</div>
+<div class="diff-add">+- Argentina65</div>
+<div class="diff-add">+- Kazakhstan66</div>
+<div class="diff-add">+- Turkey67</div>
+<div class="diff-add">+- Malaysia68</div>
+<div class="diff-add">+- Peru69</div>
+<div class="diff-add">+- Saudi Arabia70</div>
+<div class="diff-add">+- Thailand71</div>
+<div class="diff-add">+- Philippines72</div>
+<div class="diff-add">+- Kuwait73</div>
+<div class="diff-add">+- Paraguay74</div>
+<div class="diff-add">+- El Salvador75</div>
+<div class="diff-add">+- Mexico76</div>
+<div class="diff-add">+- Mongolia77</div>
+<div class="diff-add">+- Kyrgyzstan78</div>
+<div class="diff-add">+- Kenya79</div>
+<div class="diff-add">+- Ecuador80</div>
+<div class="diff-add">+- South Africa81</div>
+<div class="diff-add">+- Oman82</div>
+<div class="diff-add">+- Iraq83</div>
+<div class="diff-add">+- Azerbaijan84</div>
+<div class="diff-add">+- Vietnam85</div>
+<div class="diff-add">+- Jordan86</div>
+<div class="diff-add">+- Bolivia87</div>
+<div class="diff-add">+- Palestinian Territory88</div>
+<div class="diff-add">+- Senegal89</div>
+<div class="diff-add">+- Nepal90</div>
+<div class="diff-add">+- Ghana91</div>
+<div class="diff-add">+- Algeria92</div>
+<div class="diff-add">+- Benin93</div>
+<div class="diff-add">+- Cameroon94</div>
+<div class="diff-add">+- Indonesia95</div>
+<div class="diff-add">+- Guatemala96</div>
+<div class="diff-add">+- Egypt97</div>
+<div class="diff-add">+- India98</div>
+<div class="diff-add">+- Rwanda99</div>
+<div class="diff-add">+- Nigeria100</div>
+<div class="diff-add">+- Pakistan101</div>
+<div class="diff-add">+- Ivory Coast102</div>
+<div class="diff-add">+- Togo103</div>
+<div class="diff-add">+- Honduras104</div>
+<div class="diff-add">+- Cambodia105</div>
+<div class="diff-add">+- Zimbabwe106</div>
+<div class="diff-add">+- Uzbekistan107</div>
+<div class="diff-add">+- Burkina Faso108</div>
+<div class="diff-add">+- Haiti109</div>
+<div class="diff-add">+- Madagascar110</div>
+<div class="diff-add">+- Zambia111</div>
+<div class="diff-add">+- Bangladesh112</div>
+<div class="diff-add">+- Angola113</div>
+<div class="diff-add">+- Uganda114</div>
+<div class="diff-add">+- Tanzania115</div>
+<div class="diff-add">+- Mozambique116</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+Percentages represent the share of Claude.ai conversations associated with each task or group of tasks. Graphic shows what people do with Claude, not their job titles. Percentages don’t sum to 100% because we impose privacy filters.</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+### Explore by job</div>
+<div class="diff-add">+</div>
+<div class="diff-add">+People use AI to automate certain parts of their jobs, like data entry. When exploring problems or ideas, Claude becomes a collaborative partner instead. Other tasks remain firmly in human hands.</div></div>
+  <div class="help" style="margin-top: 0.75rem">
+    <span style="color: var(--green)">Green</span> = visible to humans but not AI.
+    <span style="color: var(--red)">Red</span> = visible to AI but not humans.
+  </div>
+</div>
+
+<footer>
+  Generated by <strong>tulkki 2026-04-10 08:33 UTC</strong>
+  &middot; <a href="https://github.com/anthropics/tulkki" style="color: var(--cyan)">github.com/anthropics/tulkki</a>
+</footer>
+
+</body>
+</html>
