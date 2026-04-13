@@ -55,7 +55,7 @@ tulkki fills the gap: a small, auditable, reproducible CLI that runs locally (no
 tulkki is not yet on PyPI. Install from source with [uv](https://docs.astral.sh/uv/):
 
 ```sh
-git clone https://github.com/tulkki-dev/tulkki
+git clone https://github.com/wcl-dev/tulkki
 cd tulkki
 uv sync
 uv run playwright install chromium
@@ -193,7 +193,7 @@ The `--raw-fetcher` and `--renderer` flags accept alternative backends. Addition
 ## Development
 
 ```sh
-git clone https://github.com/tulkki-dev/tulkki
+git clone https://github.com/wcl-dev/tulkki
 cd tulkki
 uv sync
 uv run playwright install chromium
