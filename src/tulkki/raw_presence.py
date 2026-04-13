@@ -20,14 +20,32 @@ from .types import ExtractedDoc, Heading, RawPresenceReport
 
 # --- Configuration -----------------------------------------------------------
 
-MIN_SENTENCE_CHARS = 45  # shorter fragments ("OK.", "Learn more") cause false positives
+# Minimum sentence length. Two thresholds because CJK (Chinese, Japanese,
+# Korean) is information-denser than Latin scripts — a 15-character Chinese
+# sentence is a full thought, whereas a 15-character Latin fragment is
+# usually boilerplate. We apply the CJK threshold when the sentence is
+# more than half CJK characters.
+MIN_SENTENCE_CHARS_LATIN = 45
+MIN_SENTENCE_CHARS_CJK = 15
 MAX_SENTENCES = 400  # cap work on very large pages
 PROBE_CHARS = 60  # first N chars of a sentence are enough to be unique
 
-# Sentence boundary: period/exclamation/question followed by whitespace then
-# an uppercase letter, digit, or opening quote. Not perfect, but good enough
-# for the purpose of splitting rendered content into searchable chunks.
-_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(])")
+# Sentence boundary patterns for Latin + CJK.
+# Latin: period/exclamation/question + whitespace + capital/digit/quote.
+# CJK: full-width period/exclamation/question/semicolon (。！？；) and
+# their half-width equivalents, optionally followed by whitespace.
+_SENT_SPLIT_LATIN = re.compile(
+    r"(?<=[.!?])\s+"
+    r"(?=[A-Z0-9\"'("
+    r"\u3400-\u4dbf\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af"
+    r"])"
+)
+_SENT_SPLIT_CJK = re.compile(r"(?<=[\u3002\uff01\uff1f\uff1b])")
+
+# CJK character range (matches what extractor.py uses).
+_CJK_CHAR_RE = re.compile(
+    r"[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]"
+)
 
 # Known framework signatures detected by substring search on raw HTML.
 FRAMEWORK_SIGNATURES: dict[str, str] = {
@@ -99,24 +117,51 @@ def _normalize_needle(sentence: str) -> str:
 # --- Sentence extraction -----------------------------------------------------
 
 
+def _is_cjk_dominant(s: str) -> bool:
+    """Return True if more than half of the alphabetic characters are CJK."""
+    if not s:
+        return False
+    cjk_count = len(_CJK_CHAR_RE.findall(s))
+    # Count "meaningful" characters: letters + CJK, ignore digits and punctuation
+    alpha_count = sum(1 for c in s if c.isalpha() or _CJK_CHAR_RE.match(c))
+    if alpha_count == 0:
+        return False
+    return cjk_count / alpha_count > 0.5
+
+
+def _min_sentence_chars(s: str) -> int:
+    """Pick the right minimum length for the script in the sentence."""
+    return MIN_SENTENCE_CHARS_CJK if _is_cjk_dominant(s) else MIN_SENTENCE_CHARS_LATIN
+
+
 def _sentences(markdown: str) -> list[str]:
     """Split rendered markdown into sentences suitable for presence-checking.
 
-    Strips markdown syntax, splits on sentence boundaries, and drops
-    fragments shorter than MIN_SENTENCE_CHARS to avoid false positives
-    from boilerplate like "OK.", "Learn more", or nav items.
+    Strips markdown syntax, then splits on both Latin sentence boundaries
+    (.!? followed by capital/digit/quote) and CJK sentence boundaries
+    (。！？；、 with optional whitespace).
 
-    .. note:: CJK limitation
-       The sentence-boundary regex assumes Latin punctuation (.!?) followed
-       by a capital letter. Chinese, Japanese, and Korean text uses different
-       sentence-ending punctuation (。！？) and has no uppercase/lowercase
-       distinction. CJK support requires a different splitting strategy
-       and is tracked for v0.2.1 alongside the CJK word-count fix.
+    Drops fragments shorter than the script-appropriate minimum length:
+    - Latin text: 45 characters (filters out "OK.", "Learn more", nav items)
+    - CJK text: 15 characters (CJK is information-denser)
+
+    This lets tulkki handle Chinese, Japanese, and Korean pages without
+    either over-counting boilerplate or dropping legitimate short sentences.
     """
     text = re.sub(r"[#*_`>\[\]()!]", " ", markdown)
     text = re.sub(r"\s+", " ", text).strip()
-    raw = _SENT_SPLIT.split(text)
-    return [s for s in raw if len(s) >= MIN_SENTENCE_CHARS][:MAX_SENTENCES]
+
+    # Run Latin split first, then CJK split on each result. This handles
+    # mixed-script pages (e.g. a Chinese paragraph followed by an English
+    # one) without losing either boundary.
+    latin_split = _SENT_SPLIT_LATIN.split(text)
+    sentences: list[str] = []
+    for chunk in latin_split:
+        for subchunk in _SENT_SPLIT_CJK.split(chunk):
+            subchunk = subchunk.strip()
+            if subchunk and len(subchunk) >= _min_sentence_chars(subchunk):
+                sentences.append(subchunk)
+    return sentences[:MAX_SENTENCES]
 
 
 # --- Heading deduplication ---------------------------------------------------

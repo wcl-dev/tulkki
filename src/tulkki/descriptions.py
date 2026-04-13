@@ -77,6 +77,16 @@ FRAMEWORK_DETECTION = (
     "packaging is hiding the content."
 )
 
+CJK_SUPPORT = (
+    "tulkki handles Chinese, Japanese, and Korean (CJK) pages. Word "
+    "counts treat each ideograph, kana, or syllable block as one word "
+    "(since CJK scripts don't use spaces between words). Sentence "
+    "splitting recognises full-width punctuation (。！？；) and uses a "
+    "shorter minimum length (15 characters) for CJK sentences than for "
+    "Latin sentences (45 characters) — CJK is information-denser, so "
+    "shorter strings carry real content rather than UI boilerplate."
+)
+
 # Plain-text versions for HTML report (no rich markup)
 METRIC_HELP_PLAIN = {
     "raw_html_coverage": (
@@ -94,4 +104,5 @@ METRIC_HELP_PLAIN = {
         "actually see."
     ),
     "gap_kind": GAP_KIND,
+    "cjk_support": CJK_SUPPORT,
 }

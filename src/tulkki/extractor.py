@@ -16,6 +16,19 @@ from .types import ExtractedDoc, Heading
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 
+# CJK character ranges: Chinese, Japanese, Korean. Covers Unified
+# Ideographs, Extension A, Hiragana, Katakana, and Hangul. CJK writing
+# systems don't separate words with spaces, so each ideograph / kana /
+# syllable block counts as one "word" for word_count purposes.
+_CJK_CHAR_RE = re.compile(
+    r"[\u3400-\u4dbf"   # CJK Extension A
+    r"\u4e00-\u9fff"    # CJK Unified Ideographs
+    r"\u3040-\u309f"    # Hiragana
+    r"\u30a0-\u30ff"    # Katakana
+    r"\uac00-\ud7af"    # Hangul Syllables
+    r"]"
+)
+
 
 def _parse_headings(markdown: str) -> tuple[Heading, ...]:
     headings: list[Heading] = []
@@ -37,9 +50,22 @@ def _parse_headings(markdown: str) -> tuple[Heading, ...]:
 
 
 def _word_count(markdown: str) -> int:
+    """Count words in markdown text, handling Latin and CJK scripts.
+
+    Latin scripts are space-separated — we use str.split().
+    CJK scripts (Chinese, Japanese, Korean) have no spaces between
+    logical words, so each CJK character counts as one word. This
+    approximates what a reader experiences — a 500-character Chinese
+    article is the reading equivalent of a 500-word English one.
+    """
     # Strip markdown syntax characters that would inflate the count
     stripped = re.sub(r"[#*_`>\[\]()!]", " ", markdown)
-    return len(stripped.split())
+    # Count each CJK character as one word
+    cjk_chars = _CJK_CHAR_RE.findall(stripped)
+    # Strip CJK chars out, then count the remaining Latin words by spaces
+    latin_only = _CJK_CHAR_RE.sub(" ", stripped)
+    latin_words = latin_only.split()
+    return len(cjk_chars) + len(latin_words)
 
 
 class TrafilaturaExtractor:

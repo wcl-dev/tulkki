@@ -36,6 +36,31 @@ def test_word_count_strips_markdown_syntax() -> None:
     assert _word_count("***") == 0
 
 
+def test_word_count_chinese_counts_each_character() -> None:
+    """Chinese text has no spaces, so each ideograph counts as one word.
+    A ten-character sentence should count as 10."""
+    md = "今天天氣真的很好"  # 8 characters
+    assert _word_count(md) == 8
+
+
+def test_word_count_japanese_counts_each_kana_and_kanji() -> None:
+    """Hiragana, katakana, and kanji each count individually."""
+    md = "私はカタカナです"  # 8 chars: mix of hiragana, kanji, katakana
+    assert _word_count(md) == 8
+
+
+def test_word_count_korean_counts_each_syllable_block() -> None:
+    md = "안녕하세요"  # 5 Hangul syllable blocks
+    assert _word_count(md) == 5
+
+
+def test_word_count_mixed_scripts() -> None:
+    """Mixed CJK + Latin: CJK chars counted individually, Latin by spaces."""
+    md = "I love 台灣 very much"
+    # Latin: "I love very much" = 4 words; CJK: 台灣 = 2 chars; total = 6
+    assert _word_count(md) == 6
+
+
 def test_extract_smoke_on_realistic_html() -> None:
     """Use a realistic-length article so trafilatura's main-content
     detection actually engages and emits Markdown headings."""

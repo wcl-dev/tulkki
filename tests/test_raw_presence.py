@@ -8,7 +8,8 @@ import pytest
 
 from tulkki.raw_presence import (
     FRAMEWORK_SIGNATURES,
-    MIN_SENTENCE_CHARS,
+    MIN_SENTENCE_CHARS_CJK,
+    MIN_SENTENCE_CHARS_LATIN,
     _normalize_haystack,
     _sentences,
     analyze,
@@ -31,7 +32,7 @@ def _doc(
     )
 
 
-# Long enough sentences for testing (>= MIN_SENTENCE_CHARS)
+# Long enough sentences for testing (>= MIN_SENTENCE_CHARS_LATIN)
 SENT_WASH = (
     "Washington, D.C. is the capital city of the United States and ranks "
     "first in AI adoption among all fifty states."
@@ -130,12 +131,62 @@ def test_minified_js_noise_does_not_false_positive() -> None:
 
 
 def test_short_fragments_dropped() -> None:
-    """Fragments shorter than MIN_SENTENCE_CHARS should not be checked."""
+    """Fragments shorter than MIN_SENTENCE_CHARS_LATIN should not be checked."""
     raw_html = "<p>OK. Learn more. Yes.</p>"
     doc = _doc("OK. Learn more. Yes.", word_count=5)
     report = analyze(raw_html, doc)
     # All fragments are too short -> sentences_checked == 0 -> coverage 1.0
     assert report.sentences_checked == 0
+    assert report.sentence_coverage == 1.0
+
+
+# --- CJK sentence splitting --------------------------------------------------
+
+
+def test_sentences_splits_on_chinese_period() -> None:
+    """Chinese full-width period 。 should split sentences."""
+    md = (
+        "今天我們來討論人工智能對經濟的影響有多麼深遠。"
+        "這個問題其實沒有那麼簡單需要仔細探討一番。"
+        "接下來我們會分段深入研究每一個層面。"
+    )
+    sentences = _sentences(md)
+    assert len(sentences) == 3
+
+
+def test_sentences_uses_short_threshold_for_cjk() -> None:
+    """A 20-character Chinese sentence is real content, not boilerplate.
+    Latin 45-char threshold would drop it; CJK 15-char threshold keeps it."""
+    md = "今天天氣真的非常好啊我覺得應該出門走走。"
+    sentences = _sentences(md)
+    assert len(sentences) == 1
+
+
+def test_sentences_drops_very_short_cjk() -> None:
+    """Even with the CJK threshold, fragments under 15 chars are dropped."""
+    md = "好的。謝謝。不客氣。"  # all under 15 chars
+    sentences = _sentences(md)
+    assert len(sentences) == 0
+
+
+def test_sentences_mixed_chinese_english() -> None:
+    """A page with both Chinese and English paragraphs should split both."""
+    md = (
+        "Washington, D.C. is the capital city of the United States "
+        "and ranks first in AI adoption. "
+        "今天我們來討論人工智能對經濟的影響有多麼深遠。"
+    )
+    sentences = _sentences(md)
+    # Should get both the English sentence (45+ chars) and the Chinese one (15+ chars)
+    assert len(sentences) == 2
+
+
+def test_cjk_sentence_matches_against_raw_html() -> None:
+    """End-to-end: Chinese rendered content should match against Chinese raw HTML."""
+    sentence = "今天我們來討論人工智能對經濟的影響有多麼深遠。"
+    raw_html = f"<html><body><p>{sentence}</p></body></html>"
+    doc = _doc(sentence, word_count=20)
+    report = analyze(raw_html, doc)
     assert report.sentence_coverage == 1.0
 
 

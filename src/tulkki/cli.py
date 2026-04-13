@@ -86,6 +86,7 @@ def explain() -> None:
             ).replace("Red lines", "[red]Red lines[/red]"),
         ),
         ("Framework detection", desc.FRAMEWORK_DETECTION),
+        ("Chinese / Japanese / Korean support", desc.CJK_SUPPORT),
     ]
 
     for title, body in sections:
