@@ -54,7 +54,20 @@ tulkki fills the gap: a small, auditable, reproducible CLI that runs locally (no
 
 ## Install
 
-tulkki is not yet on PyPI. Install from source with [uv](https://docs.astral.sh/uv/):
+tulkki isn't on PyPI yet — a release is planned once the batch-scan mode
+(v0.3) ships. In the meantime, install straight from GitHub with pipx:
+
+```sh
+pipx install --include-deps git+https://github.com/wcl-dev/tulkki.git
+playwright install chromium
+tulkki check https://example.com
+```
+
+The `--include-deps` flag exposes Playwright's CLI alongside tulkki so you
+can fetch Chromium in one step. Chromium is ~108 MB and only needs
+installing once per machine.
+
+### From source (for development)
 
 ```sh
 git clone https://github.com/wcl-dev/tulkki
@@ -62,9 +75,8 @@ cd tulkki
 uv sync
 uv run playwright install chromium
 uv run tulkki check https://example.com
+uv run pytest tests/          # optional: run the 58-test suite
 ```
-
-Playwright's Chromium is ~108 MB and only needs installing once per machine. A PyPI release is planned once the API stabilises.
 
 ## Usage
 
