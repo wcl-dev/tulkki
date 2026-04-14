@@ -1,0 +1,56 @@
+name: install-smoke-test
+
+# Verifies that the pipx install flow documented in README.md actually
+# works end-to-end from a clean environment. Runs after every push and
+# on pull requests so any change that breaks the install path gets
+# caught before users hit it.
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  pipx-install-from-git:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pipx
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pipx
+          python -m pipx ensurepath
+
+      - name: pipx install tulkki from this commit
+        # Uses the exact command from README.md. github.sha pins to the
+        # commit that triggered this workflow so we test what was just
+        # pushed, not whatever master happens to be at CI run time.
+        run: |
+          pipx install --include-deps \
+            "git+https://github.com/${{ github.repository }}@${{ github.sha }}"
+
+      - name: Verify tulkki CLI is on PATH
+        run: which tulkki && tulkki --help
+
+      - name: Verify playwright CLI is exposed by --include-deps
+        # If this fails, --include-deps didn't work as expected and the
+        # README's install flow would leave users unable to fetch Chromium.
+        run: which playwright && playwright --version
+
+      - name: Install Chromium
+        # --with-deps is CI-specific (headless runners need system libs).
+        # User machines typically already have these system libs, so the
+        # README tells users plain `playwright install chromium`. Both
+        # commands hit the same Chromium download path.
+        run: playwright install chromium --with-deps
+
+      - name: End-to-end smoke test
+        # Actually run tulkki against a reliable URL. If any part of the
+        # install chain is broken (missing dep, wrong entry point, browser
+        # not found), this fails.
+        run: tulkki check https://example.com --no-save --quiet
