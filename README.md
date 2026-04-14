@@ -33,6 +33,8 @@ $ tulkki check https://www.anthropic.com/economic-index
 
 ## Why tulkki
 
+**SEO made your site findable to Google. GEO makes your content knowable to AI.** tulkki tells you which AI systems actually know your content, which ones don't, and why.
+
 AI visibility is **not one thing** — it's three different thresholds:
 
 1. **Is the content physically in the raw HTML bytes?** (What any pipeline tokenizing HTML directly would see.)
